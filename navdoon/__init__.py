@@ -1,5 +1,5 @@
 """
-Copyright 2015 Farzad Ghanei
+Copyright 2016 Farzad Ghanei
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@ limitations under the License.
 from __future__ import absolute_import, division, print_function
 
 __title__ = "navdoon"
-__summary__ = "Statsd server using asyncio"
+__summary__ = "Portable and easy to use statsd server"
 __version__ = "0.0.1"
 __author__ = "Farzad Ghanei"
 __license__ = "Apache License, Version 2.0"
-__copyright__ = "Copyright 2015 Farzad Ghanei"
+__copyright__ = "Copyright 2016 Farzad Ghanei"

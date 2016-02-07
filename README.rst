@@ -2,7 +2,7 @@
 Navdoon
 *******
 
-Statsd server using Python asyncio.
+Portable and easy to use statsd server.
 
 
 License

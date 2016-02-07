@@ -4,7 +4,7 @@
 navdoon
 -------
 
-Statsd server using asyncio
+Portable and easy to use statsd server
 """
 
 from __future__ import print_function
@@ -20,19 +20,23 @@ except ImportError:
 
 from navdoon import (__title__, __summary__, __version__,
                      __author__, __license__)
-
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 2.7",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.1",
+    "Programming Language :: Python :: 3.2",
+    "Programming Language :: Python :: 3.3",
     "Programming Language :: Python :: 3.4",
     "Programming Language :: Python :: 3.5",
     "Programming Language :: Python :: Implementation :: CPython",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Networking :: Monitoring"
 ]
+
 
 long_description = __summary__
 with open(os.path.join(os.path.dirname(__file__), "README.rst")) as fh:
@@ -45,7 +49,6 @@ setup_params = dict(
     description = __summary__,
     long_description = long_description,
     author = __author__,
-    author_email = "farzad.ghanei@gmail.com",
     url = "https://github.com/farzadghanei/navdoon",
     license = __license__,
     classifiers = classifiers,
