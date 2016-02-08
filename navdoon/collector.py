@@ -6,10 +6,11 @@ from threading import Event
 class SocketServer(object):
     default_port = 8125
 
-    def __init__(self):
+    def __init__(self, **kargs):
         self.chunk_size = 65535
         self.socket_type = socket.SOCK_DGRAM
-        self.address = ('127.0.0.1', self.__class__.default_port)
+        self.host = '127.0.0.1'
+        self.port = self.__class__.default_port
         self.user = None
         self.group = None
         self.socket = None
@@ -17,9 +18,21 @@ class SocketServer(object):
         self._stop_queuing_requests = Event()
         self._listening = Event()
         self._should_shutdown = Event()
+        self.configure(**kargs)
 
     def __del__(self):
         self._do_shutdown()
+
+    def configure(self, **kargs):
+        """Configure the server, setting attributes.
+        Returns a list of attribute names that were affected
+        """
+        configured = []
+        for key in ('host', 'port', 'user', 'group', 'socket_type'):
+            if key in kargs:
+                setattr(self, key, kargs[key])
+                configured.append(key)
+        return configured
 
     def serve(self):
         self._bind_socket()
@@ -84,7 +97,7 @@ class SocketServer(object):
 
     def _create_socket(self):
         sock = socket.socket(socket.AF_INET, self.socket_type)
-        sock.bind(self.address)
+        sock.bind((self.host, self.port))
         if self.socket_type == socket.SOCK_STREAM:
             sock.listen(5)
         return sock

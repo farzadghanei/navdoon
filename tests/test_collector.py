@@ -37,7 +37,8 @@ class SocketServerTestCaseMixIn(object):
         self.port = find_open_port(self.host, socket_type)
         self.server = SocketServer()
         self.server.socket_type = socket_type
-        self.server.address = (self.host, self.port)
+        self.server.host = self.host
+        self.server.port = self.port
         self.server_thread = threading.Thread(target=self.server.serve)
         self.server_thread.daemon = True
 
@@ -56,6 +57,23 @@ class SocketServerTestCaseMixIn(object):
 class TestUdpServer(SocketServerTestCaseMixIn, unittest.TestCase):
     def setUp(self):
         self.setup_socket_server(socket.SOCK_DGRAM)
+
+    def test_constructor_args(self):
+        conf = dict(user='thisuser', port=9876, group='thatgroup', host='example.org')
+        server = SocketServer(**conf)
+        self.assertEquals(server.host, 'example.org')
+        self.assertEquals(server.port, 9876)
+        self.assertEquals(server.user, 'thisuser')
+        self.assertEquals(server.group, 'thatgroup')
+
+    def test_loading_configs(self):
+        conf = dict(user='someuser', port=1234, group='somegroup', host='example.org')
+        loaded = self.server.configure(**conf)
+        self.assertEquals(sorted(loaded), sorted(conf.keys()))
+        self.assertEquals(self.server.host, 'example.org')
+        self.assertEquals(self.server.port, 1234)
+        self.assertEquals(self.server.user, 'someuser')
+        self.assertEquals(self.server.group, 'somegroup')
 
     def test_queue_requests(self):
         data_set = ["test message", "could be anything"]
