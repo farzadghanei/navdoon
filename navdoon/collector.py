@@ -22,9 +22,14 @@ class SocketServer(object):
         self._do_shutdown()
 
     def serve(self):
-        self._init_queue()
         self._bind_socket()
-        self._do_serve()
+        try:
+            while not self._should_shutdown.is_set():
+                self._pre_serve()
+                self._queue_requests()
+                self._post_serve()
+        finally:
+            self._do_shutdown()
 
     def is_running(self):
         return self._listening.is_set()
@@ -38,15 +43,6 @@ class SocketServer(object):
         if force:
             self._close_socket()
             self._clear_queue(False)
-
-    def _do_serve(self):
-        try:
-            while not self._should_shutdown.is_set():
-                self._pre_serve()
-                self._queue_requests()
-                self._post_serve()
-        finally:
-            self._do_shutdown()
 
     def _pre_serve(self):
         pass
@@ -69,10 +65,6 @@ class SocketServer(object):
     def _do_shutdown(self):
         self._close_socket()
         self._clear_queue()
-
-    def _init_queue(self):
-        self._clear_queue()
-        self.queue = Queue()
 
     def _clear_queue(self, join=True):
         if self.queue:
