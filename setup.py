@@ -2,9 +2,6 @@
 
 """
 navdoon
--------
-
-Portable and easy to use statsd server
 """
 
 from __future__ import print_function

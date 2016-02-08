@@ -2,7 +2,7 @@
 Navdoon
 *******
 
-Portable and easy to use statsd server.
+Powerful Statsd server, made easy.
 
 
 License
