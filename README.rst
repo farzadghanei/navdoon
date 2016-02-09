@@ -2,6 +2,9 @@
 Navdoon
 *******
 
+.. image:: https://travis-ci.org/farzadghanei/navdoon.svg?branch=master
+    :target: https://travis-ci.org/farzadghanei/navdoon
+
 Powerful Statsd server, made easy.
 
 
