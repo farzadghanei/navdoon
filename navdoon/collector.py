@@ -99,8 +99,8 @@ class SocketServer(LoggerMixIn):
         queue_put_nowait = self.queue.put_nowait
         shutdown_rdwr = socket.SHUT_RDWR
 
-        def _enqueue_from_connection(connection, remote_address):
-            receive = connection.recv
+        def _enqueue_from_connection(conn, addr):
+            receive = conn.recv
             enqueue = queue_put_nowait
             try:
                 while not stop.is_set():
@@ -109,8 +109,8 @@ class SocketServer(LoggerMixIn):
                         break
                     enqueue(buffer)
             finally:
-                connection.shutdown(shutdown_rdwr)
-                connection.close()
+                conn.shutdown(shutdown_rdwr)
+                conn.close()
 
         try:
             self._queuing_requests.set()
@@ -150,7 +150,6 @@ class SocketServer(LoggerMixIn):
         sock = socket.socket(socket.AF_INET, self.socket_type)
         sock.bind((self.host, self.port))
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
-
         if self.socket_type == socket.SOCK_STREAM:
             sock.listen(5)
         return sock
@@ -167,8 +166,8 @@ class SocketServer(LoggerMixIn):
 
     def _change_process_user_group(self):
         if self.user:
-            self._log("Changing process user to %s ...".format(self.user))
+            self._log("changing process user to {}".format(self.user))
             os.seteuid(self.user)
         if self.group:
-            self._log("Changing process group to %s ...".format(self.group))
+            self._log("changing process group to {}".format(self.group))
             os.setegid(self.group)
