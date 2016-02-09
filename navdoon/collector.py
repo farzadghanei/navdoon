@@ -2,7 +2,6 @@ import os
 import socket
 from multiprocessing import Queue
 from threading import Event
-
 from navdoon.utils import LoggerMixIn
 
 
@@ -73,7 +72,7 @@ class SocketServer(LoggerMixIn):
         if force:
             self._log("force shutting down the server")
             self._close_socket()
-            self._clear_queue(False)
+            self._close_queue(False)
 
     def _pre_serve(self):
         pass
@@ -126,9 +125,9 @@ class SocketServer(LoggerMixIn):
 
     def _do_shutdown(self):
         self._close_socket()
-        self._clear_queue()
+        self._close_queue()
 
-    def _clear_queue(self, join=True):
+    def _close_queue(self, join=True):
         queue = self.queue
         if queue:
             queue.close()
