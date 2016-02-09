@@ -61,7 +61,7 @@ class SocketServerTestCaseMixIn(object):
 
     def start_server_send_data_and_consume_queue(self, data_set, socket_type):
         self.server_thread.start()
-        self.server.wait_until_running()
+        self.server.wait_until_queuing_requests()
         client_sock = socket.socket(socket.AF_INET, socket_type)
         client_sock.connect((self.host, self.port))
         send_through_socket(client_sock, data_set)
@@ -70,34 +70,36 @@ class SocketServerTestCaseMixIn(object):
         return in_queue
 
 
-class TestUdpServer(SocketServerTestCaseMixIn, unittest.TestCase):
+class TestUDPServer(SocketServerTestCaseMixIn, unittest.TestCase):
     def setUp(self):
         self.setup_socket_server(socket.SOCK_DGRAM)
 
     def tearDown(self):
-        self.server.shutdown(True)
+        if self.server.is_queuing_requests():
+            self.server.shutdown()
+            self.server.wait_until_shutdown(3)
         self.server = None
         gc.collect()
 
     def test_constructor_args(self):
         conf = dict(user='thisuser', port=9876, group='thatgroup', host='example.org')
         server = SocketServer(**conf)
-        self.assertEquals(server.host, 'example.org')
-        self.assertEquals(server.port, 9876)
-        self.assertEquals(server.user, 'thisuser')
-        self.assertEquals(server.group, 'thatgroup')
+        self.assertEqual(server.host, 'example.org')
+        self.assertEqual(server.port, 9876)
+        self.assertEqual(server.user, 'thisuser')
+        self.assertEqual(server.group, 'thatgroup')
 
     def test_configure(self):
         conf = dict(user='someuser', port=1234, group='somegroup', host='example.org')
         configured = self.server.configure(**conf)
-        self.assertEquals(sorted(configured), sorted(conf.keys()))
-        self.assertEquals(self.server.host, 'example.org')
-        self.assertEquals(self.server.port, 1234)
-        self.assertEquals(self.server.user, 'someuser')
-        self.assertEquals(self.server.group, 'somegroup')
+        self.assertEqual(sorted(configured), sorted(conf.keys()))
+        self.assertEqual(self.server.host, 'example.org')
+        self.assertEqual(self.server.port, 1234)
+        self.assertEqual(self.server.user, 'someuser')
+        self.assertEqual(self.server.group, 'somegroup')
 
     def test_queue_requests(self):
-        data_set = ("test message", "could be anything")
+        data_set = ("test message".encode(), "could be anything".encode())
         in_queue = self.start_server_send_data_and_consume_queue(data_set, socket.SOCK_DGRAM)
         self.assertEqual(data_set, in_queue)
 
@@ -107,22 +109,24 @@ class TestTCPServer(SocketServerTestCaseMixIn, unittest.TestCase):
         self.setup_socket_server(socket.SOCK_STREAM)
 
     def tearDown(self):
-        self.server.shutdown(True)
+        if self.server.is_queuing_requests():
+            self.server.shutdown()
+            self.server.wait_until_shutdown(3)
         self.server = None
         gc.collect()
 
     def test_constructor_args(self):
         conf = dict(socket_type=socket.SOCK_STREAM)
         server = SocketServer(**conf)
-        self.assertEquals(server.socket_type, socket.SOCK_STREAM)
+        self.assertEqual(server.socket_type, socket.SOCK_STREAM)
 
     def test_configure(self):
         conf = dict(socket_type=socket.SOCK_STREAM)
         configured = self.server.configure(**conf)
-        self.assertEquals(sorted(configured), sorted(conf.keys()))
-        self.assertEquals(self.server.socket_type, socket.SOCK_STREAM)
+        self.assertEqual(sorted(configured), sorted(conf.keys()))
+        self.assertEqual(self.server.socket_type, socket.SOCK_STREAM)
 
     def test_queue_requests(self):
-        data_set = ("test message",)
+        data_set = ("test message".encode(),)
         in_queue = self.start_server_send_data_and_consume_queue(data_set, socket.SOCK_STREAM)
         self.assertEqual(data_set, in_queue)

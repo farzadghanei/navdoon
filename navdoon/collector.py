@@ -20,7 +20,7 @@ class SocketServer(LoggerMixIn):
         self.queue = Queue()
         self._stop_queuing_requests = Event()
         self._queuing_requests = Event()
-        self._listening = Event()
+        self._shutdown = Event()
         self._should_shutdown = Event()
         self.configure(**kargs)
 
@@ -42,6 +42,7 @@ class SocketServer(LoggerMixIn):
         self._bind_socket()
         try:
             while not self._should_shutdown.is_set():
+                self._shutdown.clear()
                 self._log(
                     "starting serving requests on {} {}:{}".format(
                         self.socket_type == socket.SOCK_STREAM and 'TCP' or 'UDP',
@@ -59,20 +60,19 @@ class SocketServer(LoggerMixIn):
         finally:
             self._do_shutdown()
 
-    def is_running(self):
-        return self._listening.is_set() and self._queuing_requests.is_set()
+    def is_queuing_requests(self):
+        return self._queuing_requests.is_set()
 
-    def wait_until_running(self, timeout=None):
+    def wait_until_queuing_requests(self, timeout=None):
         self._queuing_requests.wait(timeout)
 
-    def shutdown(self, force=False):
+    def shutdown(self):
         self._log("shutting down the server ...")
         self._should_shutdown.set()
         self._stop_queuing_requests.set()
-        if force:
-            self._log("force shutting down the server")
-            self._close_socket()
-            self._close_queue(False)
+
+    def wait_until_shutdown(self, timeout=None):
+        self._shutdown.wait(timeout)
 
     def _pre_serve(self):
         pass
@@ -123,9 +123,10 @@ class SocketServer(LoggerMixIn):
     def _post_serve(self):
         pass
 
-    def _do_shutdown(self):
+    def _do_shutdown(self, join_queue=True):
         self._close_socket()
-        self._close_queue()
+        self._close_queue(join_queue)
+        self._shutdown.set()
 
     def _close_queue(self, join=True):
         queue = self.queue
@@ -144,7 +145,6 @@ class SocketServer(LoggerMixIn):
         self._change_process_user_group()
         self.socket = sock
         self._log("bound to address {}:{}".format(*sock.getsockname()))
-        self._listening.set()
 
     def _create_socket(self):
         sock = socket.socket(socket.AF_INET, self.socket_type)
@@ -158,14 +158,12 @@ class SocketServer(LoggerMixIn):
     def _close_socket(self):
         sock = self.socket
         if sock:
-            self._log("closing socket on {}:{} ...".format(*sock.getsockname()))
             try:
                 sock.shutdown(socket.SHUT_RDWR)
                 sock.close()
             except socket.error:
                 pass
         self.socket = None
-        self._listening.clear()
 
     def _change_process_user_group(self):
         if self.user:
