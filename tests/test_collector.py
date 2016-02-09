@@ -42,13 +42,14 @@ def send_through_socket(sock, data_set):
     sock.close()
 
 
-class SocketServerTestCaseMixIn(object):
-    def _create_logger(self):
-        logger = logging.Logger('navdoon.tests')
-        logger.setLevel(logging.DEBUG)
-        logger.addHandler(logging.StreamHandler(sys.stderr))
-        return logger
+def create_logger():
+    logger = logging.Logger('navdoon.tests')
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(logging.StreamHandler(sys.stderr))
+    return logger
 
+
+class SocketServerTestCaseMixIn(object):
     def setup_socket_server(self, socket_type):
         self.host = '127.0.0.1'
         self.port = find_open_port(self.host, socket_type)
