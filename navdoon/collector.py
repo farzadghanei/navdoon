@@ -150,7 +150,6 @@ class SocketServer(LoggerMixIn):
         sock = socket.socket(socket.AF_INET, self.socket_type)
         sock.bind((self.host, self.port))
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, True)
 
         if self.socket_type == socket.SOCK_STREAM:
             sock.listen(5)

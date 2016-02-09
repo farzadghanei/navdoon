@@ -16,7 +16,6 @@ def find_open_port(host, sock_type):
         try:
             sock = socket.socket(socket.AF_INET, sock_type)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, True)
             sock.bind((host, port))
             break
         except socket.error:
