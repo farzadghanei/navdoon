@@ -9,7 +9,6 @@ class TestQueueProcessor(unittest.TestCase):
 
 
 class TestStatsShelf(unittest.TestCase):
-
     def test_counter(self):
         shelf = StatsShelf()
         shelf.add(Counter("mymetric", 3))

@@ -1,7 +1,9 @@
 from copy import deepcopy
 from threading import Event
 from navdoon.utils import LoggerMixIn
-from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer, parse_metric_from_request, normalize_metric_name)
+from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer,
+                           parse_metric_from_request, normalize_metric_name)
+
 
 class QueueProcessor(LoggerMixIn):
     default_stop_process_token = None
@@ -47,16 +49,15 @@ class QueueProcessor(LoggerMixIn):
             try:
                 metric = parse_metric_from_request(line)
             except ValueError as e:
-                self._log_error("failed to parse statsd metrics from '{}'".format(line))
+                self._log_error(
+                    "failed to parse statsd metrics from '{}'".format(line))
                 continue
             self.shelf.add(metric)
 
 
 class StatsShelf(object):
 
-    _metric_add_methods = {
-        Counter.__name__: '_add_counter'
-    }
+    _metric_add_methods = {Counter.__name__: '_add_counter'}
 
     def __init__(self):
         self._counters = dict()
@@ -65,9 +66,12 @@ class StatsShelf(object):
         self._gauges = dict()
 
     def add(self, metric):
-        method_name = self.__class__._metric_add_methods.get(metric.__class__.__name__)
+        method_name = self.__class__._metric_add_methods.get(
+            metric.__class__.__name__)
         if not method_name:
-            raise ValueError("Can not add metric to shelf. No method is defined to handle {}".format(metric.__class__))
+            raise ValueError(
+                "Can not add metric to shelf. No method is defined to handle {}".format(
+                    metric.__class__))
         getattr(self, method_name)(metric)
 
     def counters(self):
