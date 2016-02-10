@@ -19,17 +19,17 @@ class TestStatsShelf(unittest.TestCase):
         expected = {"mymetric": 5, "something.else": 4}
         self.assertEqual(expected, shelf.counters())
 
+        counters = shelf.counters()
+        counters["counters should"] = "not changed"
+        self.assertEqual(expected, shelf.counters())
+
     def test_counters_rates_are_rounded(self):
         shelf = StatsShelf()
-
         shelf.add(Counter("metric", 4, 0.1))
-
         shelf.add(Counter("2nd", 1, 0.2))
         shelf.add(Counter("2nd", 10, 0.3))
-
         shelf.add(Counter("3rd", 1, 0.4))
         shelf.add(Counter("3rd", 2, 0.4))
-
         expected = {"metric": 40, "2nd": 38, "3rd": 8}
         self.assertEqual(expected, shelf.counters())
 
@@ -45,6 +45,10 @@ class TestStatsShelf(unittest.TestCase):
         shelf.add(Set("say.what?", "nothing"))
         shelf.add(Set("say.what?", "ok"))
         expected = {"users": set(("me", "you")), "say.what?": set(("nothing", "ok"))}
+        self.assertEqual(expected, shelf.sets())
+
+        sets = shelf.sets()
+        sets["sets should"] = set("not change")
         self.assertEqual(expected, shelf.sets())
 
     def test_clear_all_metrics(self):
