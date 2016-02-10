@@ -1,6 +1,6 @@
 import unittest
 
-from statsdmetrics import Counter, Set
+from statsdmetrics import Counter, Set, Gauge, GaugeDelta
 from navdoon.processor import QueueProcessor, StatsShelf
 
 
@@ -50,6 +50,38 @@ class TestStatsShelf(unittest.TestCase):
         sets = shelf.sets()
         sets["sets should"] = set("not change")
         self.assertEqual(expected, shelf.sets())
+
+    def test_gauges(self):
+        shelf = StatsShelf()
+        self.assertEqual(dict(), shelf.gauges())
+
+        shelf.add(Gauge("cpu%", 50))
+        shelf.add(Gauge("cpu%", 51))
+        shelf.add(Gauge("mem%", 20))
+        shelf.add(Gauge("mem%", 23))
+        shelf.add(Gauge("cpu%", 58))
+
+        expected = {"cpu%": 58, "mem%": 23}
+        self.assertEqual(expected, shelf.gauges())
+
+        gauges = shelf.gauges()
+        gauges["gauges should"] = "not change"
+        self.assertEqual(expected, shelf.gauges())
+
+    def test_gauge_deltas(self):
+        shelf = StatsShelf()
+        self.assertEqual(dict(), shelf.gauges())
+
+        shelf.add(GaugeDelta("cpu%", 10))
+        shelf.add(Gauge("mem%", 10))
+        shelf.add(GaugeDelta("cpu%", 10))
+        shelf.add(GaugeDelta("cpu%", -5))
+        shelf.add(GaugeDelta("mem%", -2))
+        shelf.add(GaugeDelta("mem%", 4))
+
+        expected = {"cpu%": 15, "mem%": 12}
+        self.assertEqual(expected, shelf.gauges())
+
 
     def test_clear_all_metrics(self):
         shelf = StatsShelf()

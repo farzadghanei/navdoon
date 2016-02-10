@@ -58,7 +58,9 @@ class QueueProcessor(LoggerMixIn):
 class StatsShelf(object):
 
     _metric_add_methods = {Counter.__name__: '_add_counter',
-                           Set.__name__: '_add_set'}
+                           Set.__name__: '_add_set',
+                           Gauge.__name__: '_add_gauge',
+                           GaugeDelta.__name__: '_add_gauge_delta'}
 
     def __init__(self):
         self._counters = dict()
@@ -81,6 +83,9 @@ class StatsShelf(object):
     def sets(self):
         return self._sets.copy()
 
+    def gauges(self):
+        return self._gauges.copy()
+
     def clear(self):
         self._counters = dict()
         self._timers = dict()
@@ -96,3 +101,14 @@ class StatsShelf(object):
 
     def _add_set(self, metric):
         self._sets.setdefault(metric.name, set()).add(metric.value)
+
+    def _add_gauge(self, metric):
+        self._gauges[metric.name] = metric.value
+
+    def _add_gauge_delta(self, metric):
+        gauges = self._gauges
+        name = metric.name
+        if name not in gauges:
+            gauges[name] = metric.delta
+        else:
+            gauges[name] += metric.delta
