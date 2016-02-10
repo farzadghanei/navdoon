@@ -1,6 +1,6 @@
 import unittest
 
-from statsdmetrics import Counter
+from statsdmetrics import Counter, Set
 from navdoon.processor import QueueProcessor, StatsShelf
 
 
@@ -9,10 +9,50 @@ class TestQueueProcessor(unittest.TestCase):
 
 
 class TestStatsShelf(unittest.TestCase):
-    def test_counter(self):
+    def test_counters(self):
         shelf = StatsShelf()
+        self.assertEqual(dict(), shelf.counters())
+
         shelf.add(Counter("mymetric", 3))
         shelf.add(Counter("mymetric", 2))
         shelf.add(Counter("something.else", 2, 0.5))
         expected = {"mymetric": 5, "something.else": 4}
         self.assertEqual(expected, shelf.counters())
+
+    def test_counters_rates_are_rounded(self):
+        shelf = StatsShelf()
+
+        shelf.add(Counter("metric", 4, 0.1))
+
+        shelf.add(Counter("2nd", 1, 0.2))
+        shelf.add(Counter("2nd", 10, 0.3))
+
+        shelf.add(Counter("3rd", 1, 0.4))
+        shelf.add(Counter("3rd", 2, 0.4))
+
+        expected = {"metric": 40, "2nd": 38, "3rd": 8}
+        self.assertEqual(expected, shelf.counters())
+
+    def test_sets(self):
+        shelf = StatsShelf()
+        self.assertEqual(dict(), shelf.sets())
+
+        shelf.add(Set("users", "me"))
+        shelf.add(Set("users", "me"))
+        shelf.add(Set("users", "you"))
+        shelf.add(Set("say.what?", "nothing"))
+        shelf.add(Set("users", "me"))
+        shelf.add(Set("say.what?", "nothing"))
+        shelf.add(Set("say.what?", "ok"))
+        expected = {"users": set(("me", "you")), "say.what?": set(("nothing", "ok"))}
+        self.assertEqual(expected, shelf.sets())
+
+    def test_clear_all_metrics(self):
+        shelf = StatsShelf()
+
+        shelf.add(Set("users", "me"))
+        shelf.add(Counter("mymetric", 3))
+        shelf.clear()
+
+        self.assertEqual(dict(), shelf.counters())
+        self.assertEqual(dict(), shelf.sets())

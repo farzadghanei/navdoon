@@ -57,7 +57,8 @@ class QueueProcessor(LoggerMixIn):
 
 class StatsShelf(object):
 
-    _metric_add_methods = {Counter.__name__: '_add_counter'}
+    _metric_add_methods = {Counter.__name__: '_add_counter',
+                           Set.__name__: '_add_set'}
 
     def __init__(self):
         self._counters = dict()
@@ -77,6 +78,9 @@ class StatsShelf(object):
     def counters(self):
         return self._counters.copy()
 
+    def sets(self):
+        return self._sets.copy()
+
     def clear(self):
         self._counters = dict()
         self._timers = dict()
@@ -89,3 +93,6 @@ class StatsShelf(object):
         if name not in counters:
             counters[name] = 0
         counters[name] += round(counter.count / counter.sample_rate)
+
+    def _add_set(self, metric):
+        self._sets.setdefault(metric.name, set()).add(metric.value)
