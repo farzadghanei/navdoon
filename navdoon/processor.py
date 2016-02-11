@@ -1,5 +1,5 @@
 from copy import deepcopy
-from threading import Event
+from threading import Event, Lock
 from navdoon.utils import LoggerMixIn
 from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer,
                            parse_metric_from_request, normalize_metric_name)
@@ -63,6 +63,7 @@ class StatsShelf(object):
                            GaugeDelta.__name__: '_add_gauge_delta'}
 
     def __init__(self):
+        self._lock = Lock()
         self._counters = dict()
         self._timers = dict()
         self._sets = dict()
@@ -74,8 +75,9 @@ class StatsShelf(object):
         if not method_name:
             raise ValueError(
                 "Can not add metric to shelf. No method is defined to handle {}".format(
-                    metric.__class__))
-        getattr(self, method_name)(metric)
+                    metric.__class__.__name__))
+        with self._lock:
+            getattr(self, method_name)(metric)
 
     def counters(self):
         return self._counters.copy()
