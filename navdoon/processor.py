@@ -1,4 +1,3 @@
-from copy import deepcopy
 from threading import Event, Lock
 from navdoon.utils import LoggerMixIn
 from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer,
@@ -14,6 +13,7 @@ class QueueProcessor(LoggerMixIn):
         self.stop_process_token = self.__class__.default_stop_process_token
         self._should_stop_processing = Event()
         self._processing = Event()
+        self._processing_lock = Lock()
         self._shelf = StatsShelf()
 
     def is_processing(self):
@@ -23,22 +23,23 @@ class QueueProcessor(LoggerMixIn):
         return self._processing.wait(timeout)
 
     def process(self):
-        stop = self._should_stop_processing
-        self._log("processing the queue")
-        self._processing.set()
-        try:
-            while stop.is_set():
-                data = self._queue.get()
-                if data == self.stop_process_token:
-                    self._log_debug("got stop process token in queue")
-                    break
-                if not data:
-                    self._log_debug("skipping empty data in queue")
-                    continue
-                self._process_request(data)
-        finally:
-            self._log("stopped processing the queue")
-            self._processing.clear()
+        with self._processing_lock:
+            stop = self._should_stop_processing
+            self._log("processing the queue")
+            self._processing.set()
+            try:
+                while stop.is_set():
+                    data = self._queue.get()
+                    if data == self.stop_process_token:
+                        self._log_debug("got stop process token in queue")
+                        break
+                    if not data:
+                        self._log_debug("skipping empty data in queue")
+                        continue
+                    self._process_request(data)
+            finally:
+                self._log("stopped processing the queue")
+                self._processing.clear()
 
     def _process_request(self, request):
         lines = [line.strip() for line in request.split("\n")]
