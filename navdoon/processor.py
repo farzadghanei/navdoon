@@ -100,7 +100,7 @@ class StatsShelf(object):
         name = counter.name
         if name not in counters:
             counters[name] = 0
-        counters[name] += round(counter.count / counter.sample_rate)
+        counters[name] += counter.count / counter.sample_rate
 
     def _add_set(self, metric):
         self._sets.setdefault(metric.name, set()).add(metric.value)
