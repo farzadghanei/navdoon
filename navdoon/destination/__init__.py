@@ -6,3 +6,4 @@ flushed to
 """
 
 from navdoon.destination.graphite import Graphite
+from navdoon.destination.stream import Stream, Stdout
