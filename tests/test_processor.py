@@ -34,7 +34,8 @@ class TestStatsShelf(unittest.TestCase):
         shelf.add(Set("users", "me"))
         shelf.add(Set("say.what?", "nothing"))
         shelf.add(Set("say.what?", "ok"))
-        expected = {"users": set(("me", "you")), "say.what?": set(("nothing", "ok"))}
+        expected = {"users": set(("me", "you")),
+                    "say.what?": set(("nothing", "ok"))}
         self.assertEqual(expected, shelf.sets())
 
         sets = shelf.sets()
@@ -71,7 +72,6 @@ class TestStatsShelf(unittest.TestCase):
 
         expected = {"cpu%": 15, "mem%": 12}
         self.assertEqual(expected, shelf.gauges())
-
 
     def test_clear_all_metrics(self):
         shelf = StatsShelf()
