@@ -5,9 +5,19 @@ python:
   - "3.3"
   - "3.2"
   - "2.7"
+
+before_install:
+  - pip install codecov
+
 install:
   - "pip install -r requirements-dev.txt"
+
 script:
   - "python setup.py test"
+
+after_success:
+  - codecov
+
 notifications:
   email: false
+
