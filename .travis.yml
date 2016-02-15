@@ -14,7 +14,7 @@ install:
   - "pip install -r requirements-dev.txt"
 
 script:
-  - "coverage run setup.py test"
+  - "./run-test-coverage"
 
 after_success:
   - codecov
