@@ -22,7 +22,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 2.7",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.1",
     "Programming Language :: Python :: 3.2",
     "Programming Language :: Python :: 3.3",
     "Programming Language :: Python :: 3.4",
@@ -44,7 +43,8 @@ setup_params = dict(name=__title__,
                     author=__author__,
                     url="https://github.com/farzadghanei/navdoon",
                     license=__license__,
-                    classifiers=classifiers, )
+                    classifiers=classifiers,
+                    install_requires=["statsdmetrics>=0.3"])
 
 setup_params["keywords"] = "statsd monitoring"
 setup_params["test_suite"] = "tests"
