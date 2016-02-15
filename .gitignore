@@ -12,4 +12,5 @@ sdist/
 docs/_build/
 
 .idea
+.coverage
 tags
