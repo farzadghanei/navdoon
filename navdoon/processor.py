@@ -1,4 +1,5 @@
-from threading import Event, Lock
+from time import time
+from threading import Event, Lock, Thread
 from navdoon.utils import LoggerMixIn
 from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer,
                            parse_metric_from_request, normalize_metric_name)
@@ -9,12 +10,16 @@ class QueueProcessor(LoggerMixIn):
 
     def __init__(self, queue):
         LoggerMixIn.__init__(self)
-        self._queue = queue
         self.stop_process_token = self.__class__.default_stop_process_token
+        self.flush_interval = 1
+        self._queue = queue
         self._should_stop_processing = Event()
         self._processing = Event()
         self._processing_lock = Lock()
+        self._flush_lock = Lock()
         self._shelf = StatsShelf()
+        self._destinations = []
+        self._last_flush_timestamp = 0
 
     def is_processing(self):
         return self._processing.is_set()
@@ -22,9 +27,22 @@ class QueueProcessor(LoggerMixIn):
     def wait_until_processing(self, timeout=None):
         return self._processing.wait(timeout)
 
+    def add_destination(self, destination):
+        if not hasattr(destination, 'flush') or not callable(destination.flush):
+            raise ValueError("Invalid destination for queue processor." \
+                    "Destination should have a flush() method")
+        if destination not in self._destinations:
+            self._destinations.append(destination)
+        return self
+
+    def clear_destinations(self):
+        self._destinations = []
+        return self
+
     def process(self):
         with self._processing_lock:
             stop = self._should_stop_processing
+            self._last_flush_timestamp = time()
             self._log("processing the queue")
             self._processing.set()
             try:
@@ -37,9 +55,24 @@ class QueueProcessor(LoggerMixIn):
                         self._log_debug("skipping empty data in queue")
                         continue
                     self._process_request(data)
+                    if time() - self._last_flush_timestamp >= self.flush_interval:
+                        self.flush()
             finally:
                 self._log("stopped processing the queue")
                 self._processing.clear()
+
+    def flush(self):
+        with self._flush_lock:
+            now = time()
+            metrics = self._get_metrics_and_clear_shelf(now)
+            for destination in self._destinations:
+                try:
+                    call_destination_thread = Thread(target=destination.flush, args=[metrics])
+                    call_destination_thread.daemon = True
+                    call_destination_thread.start()
+                except Exception as exp:
+                    self._log_error("error occurred while flushing to destination: {}".format(exp))
+            self._last_flush_timestamp = now
 
     def _process_request(self, request):
         lines = [line.strip() for line in request.split("\n")]
@@ -54,6 +87,25 @@ class QueueProcessor(LoggerMixIn):
                     "failed to parse statsd metrics from '{}'".format(line))
                 continue
             self.shelf.add(metric)
+
+    def _get_metrics_and_clear_shelf(self, timestamp):
+        shelf = self._shelf
+        counters = shelf.counters()
+        gauges = shelf.gauges()
+        sets = shelf.sets()
+        shelf.clear()
+
+        metrics = []
+        for name, value in counters.iteritems():
+            metrics.append((name, value, default_timestamp))
+
+        for name, value in gauges.iteritems():
+            metrics.append((name, value, default_timestamp))
+
+        for name, value in sets.iteritems():
+            metrics.append((name, value, default_timestamp))
+
+        return metrics
 
 
 class StatsShelf(object):

@@ -1,11 +1,54 @@
 import unittest
-
+try:
+    from queue import Queue
+except ImportError:
+    from Queue import Queue
 from statsdmetrics import Counter, Set, Gauge, GaugeDelta
 from navdoon.processor import QueueProcessor, StatsShelf
 
 
-class TestQueueProcessor(unittest.TestCase):
+class DestinationWithoutFlushMethod(object):
     pass
+
+
+class StubDestination(object):
+    def __init__(self):
+        self.metrics = []
+
+    def flush(self, metrics):
+        self.metrics.extend(metrics)
+
+
+class TestQueueProcessor(unittest.TestCase):
+
+    def test_add_destination_fails_when_flush_method_is_missing(self):
+        invalid_destinations = ["not callable", DestinationWithoutFlushMethod]
+        processor = QueueProcessor(Queue())
+        for dest in invalid_destinations:
+            self.assertRaises(ValueError, processor.add_destination, dest)
+
+    def test_add_destinations(self):
+        destination = StubDestination()
+        destination2 = StubDestination()
+        queue = Queue()
+        processor = QueueProcessor(queue)
+
+        processor.add_destination(destination)
+        processor.add_destination(destination)
+        self.assertEqual([destination], processor._destinations)
+
+        processor.add_destination(destination2)
+        self.assertEqual([destination, destination2], processor._destinations)
+
+    def test_clear_destinations(self):
+        destination = StubDestination()
+        queue = Queue()
+        processor = QueueProcessor(queue)
+        processor.add_destination(destination)
+        self.assertEqual([destination], processor._destinations)
+        processor.clear_destinations()
+        self.assertEqual([], processor._destinations)
+
 
 
 class TestStatsShelf(unittest.TestCase):
