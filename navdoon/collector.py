@@ -43,13 +43,9 @@ class SocketServer(LoggerMixIn):
         try:
             while not self._should_shutdown.is_set():
                 self._shutdown.clear()
-                self._log(
-                    "starting serving requests on {} {}:{}".format(
-                        self.socket_type == socket.SOCK_STREAM and 'TCP' or 'UDP',
-                        self.host,
-                        self.port
-                    )
-                )
+                self._log("starting serving requests on {} {}:{}".format(
+                    self.socket_type == socket.SOCK_STREAM and 'TCP' or 'UDP',
+                    self.host, self.port))
                 self._pre_serve()
                 if self.socket_type == socket.SOCK_STREAM:
                     self._queue_requests_tcp()

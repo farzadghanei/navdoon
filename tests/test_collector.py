@@ -83,7 +83,10 @@ class TestUDPServer(SocketServerTestCaseMixIn, unittest.TestCase):
         gc.collect()
 
     def test_constructor_args(self):
-        conf = dict(user='thisuser', port=9876, group='thatgroup', host='example.org')
+        conf = dict(user='thisuser',
+                    port=9876,
+                    group='thatgroup',
+                    host='example.org')
         server = SocketServer(**conf)
         self.assertEqual(server.host, 'example.org')
         self.assertEqual(server.port, 9876)
@@ -91,7 +94,10 @@ class TestUDPServer(SocketServerTestCaseMixIn, unittest.TestCase):
         self.assertEqual(server.group, 'thatgroup')
 
     def test_configure(self):
-        conf = dict(user='someuser', port=1234, group='somegroup', host='example.org')
+        conf = dict(user='someuser',
+                    port=1234,
+                    group='somegroup',
+                    host='example.org')
         configured = self.server.configure(**conf)
         self.assertEqual(sorted(configured), sorted(conf.keys()))
         self.assertEqual(self.server.host, 'example.org')
@@ -101,7 +107,8 @@ class TestUDPServer(SocketServerTestCaseMixIn, unittest.TestCase):
 
     def test_queue_requests(self):
         data_set = ("test message".encode(), "could be anything".encode())
-        in_queue = self.start_server_send_data_and_consume_queue(data_set, socket.SOCK_DGRAM)
+        in_queue = self.start_server_send_data_and_consume_queue(
+            data_set, socket.SOCK_DGRAM)
         self.assertEqual(data_set, in_queue)
 
 
@@ -128,6 +135,7 @@ class TestTCPServer(SocketServerTestCaseMixIn, unittest.TestCase):
         self.assertEqual(self.server.socket_type, socket.SOCK_STREAM)
 
     def test_queue_requests(self):
-        data_set = ("test message".encode(),)
-        in_queue = self.start_server_send_data_and_consume_queue(data_set, socket.SOCK_STREAM)
+        data_set = ("test message".encode(), )
+        in_queue = self.start_server_send_data_and_consume_queue(
+            data_set, socket.SOCK_STREAM)
         self.assertEqual(data_set, in_queue)
