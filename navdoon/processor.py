@@ -1,5 +1,9 @@
 from time import time
-from threading import Event, Lock, Thread
+from threading import Event, RLock, Thread
+try:
+    from Queue import Queue, Empty
+except ImportError:
+    from queue import Queue, Empty
 from navdoon.utils import LoggerMixIn
 from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer,
                            parse_metric_from_request, normalize_metric_name)
@@ -15,17 +19,12 @@ class QueueProcessor(LoggerMixIn):
         self._queue = queue
         self._should_stop_processing = Event()
         self._processing = Event()
-        self._processing_lock = Lock()
-        self._flush_lock = Lock()
+        self._shutdown = Event()
+        self._processing_lock = RLock()
+        self._flush_lock = RLock()
         self._shelf = StatsShelf()
         self._destinations = []
         self._last_flush_timestamp = 0
-
-    def is_processing(self):
-        return self._processing.is_set()
-
-    def wait_until_processing(self, timeout=None):
-        return self._processing.wait(timeout)
 
     def add_destination(self, destination):
         if not hasattr(destination, 'flush') or not callable(destination.flush):
@@ -39,32 +38,53 @@ class QueueProcessor(LoggerMixIn):
         self._destinations = []
         return self
 
+    def is_processing(self):
+        return self._processing.is_set()
+
+    def wait_until_processing(self, timeout=None):
+        return self._processing.wait(timeout)
+
     def process(self):
+        self._log_debug("queue processor waiting for lock ...")
         with self._processing_lock:
+            self._log_debug("queue process lock aquired!")
             stop = self._should_stop_processing
             self._last_flush_timestamp = time()
             self._log("processing the queue")
+            self._shutdown.clear()
             self._processing.set()
+            queue = self._queue
             try:
-                while stop.is_set():
-                    data = self._queue.get()
-                    if data == self.stop_process_token:
-                        self._log_debug("got stop process token in queue")
+                while True:
+                    if stop.is_set():
+                        self._log_debug("queue processor instructed to stop")
                         break
+                    try:
+                        data = queue.get(timeout=1)
+                    except Empty:
+                        continue
                     if not data:
                         self._log_debug("skipping empty data in queue")
                         continue
+                    if data == self.stop_process_token:
+                        self._log("got stop process token in queue")
+                        break
                     self._process_request(data)
                     if time() - self._last_flush_timestamp >= self.flush_interval:
                         self.flush()
             finally:
                 self._log("stopped processing the queue")
                 self._processing.clear()
+                self._shutdown.set()
 
     def flush(self):
+        self._log_debug("queue processor waiting for flushing lock ...")
         with self._flush_lock:
+            self._log_debug("queue processor flushing lock aquired")
             now = time()
             metrics = self._get_metrics_and_clear_shelf(now)
+            self._log("flushing '{}' metrics to '{}' destinations".format(
+                len(metrics), len(self._destinations)))
             for destination in self._destinations:
                 try:
                     call_destination_thread = Thread(target=destination.flush, args=[metrics])
@@ -74,9 +94,17 @@ class QueueProcessor(LoggerMixIn):
                     self._log_error("error occurred while flushing to destination: {}".format(exp))
             self._last_flush_timestamp = now
 
+    def shutdown(self):
+        self._log("shutting down the queue processor ...")
+        self._should_stop_processing.set()
+
+    def wait_until_shutdown(self, timeout=None):
+        return self._shutdown.wait(timeout)
+
     def _process_request(self, request):
+        self._log_debug("processing metrics: {}".format(str(request)))
         lines = [line.strip() for line in request.split("\n")]
-        stop = self._should_stop_processing()
+        stop = self._should_stop_processing
         for line in lines:
             if stop.is_set():
                 break
@@ -86,7 +114,7 @@ class QueueProcessor(LoggerMixIn):
                 self._log_error(
                     "failed to parse statsd metrics from '{}'".format(line))
                 continue
-            self.shelf.add(metric)
+            self._shelf.add(metric)
 
     def _get_metrics_and_clear_shelf(self, timestamp):
         shelf = self._shelf
@@ -116,7 +144,7 @@ class StatsShelf(object):
                            GaugeDelta.__name__: '_add_gauge_delta'}
 
     def __init__(self):
-        self._lock = Lock()
+        self._lock = RLock()
         self._counters = dict()
         self._timers = dict()
         self._sets = dict()

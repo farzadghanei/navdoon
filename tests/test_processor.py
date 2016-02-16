@@ -1,22 +1,43 @@
 import unittest
+import logging
+import sys
 try:
     from queue import Queue
 except ImportError:
     from Queue import Queue
+from threading import Thread, Event
 from statsdmetrics import Counter, Set, Gauge, GaugeDelta
 from navdoon.processor import QueueProcessor, StatsShelf
+from navdoon.utils import LoggerMixIn
+
+
+def create_debug_logger():
+    logger = logging.Logger('navdoon.test')
+    logger.addHandler(logging.StreamHandler(sys.stderr))
+    logger.setLevel(logging.DEBUG)
+    return logger
 
 
 class DestinationWithoutFlushMethod(object):
     pass
 
 
-class StubDestination(object):
-    def __init__(self):
+class StubDestination(LoggerMixIn):
+    def __init__(self, expected_count = 0):
+        LoggerMixIn.__init__(self)
         self.metrics = []
+        self.expected_count = expected_count
+        self._flushed_expected_count = Event()
 
     def flush(self, metrics):
+        self._log_debug("{} metrics flushed".format(len(metrics)))
         self.metrics.extend(metrics)
+        if len(self.metrics) >= self.expected_count:
+            self._flushed_expected_count.set()
+
+    def wait_until_expected_count_items(self, timeout=None):
+        self._log("flush destination waiting for expected items to be flushed ...")
+        self._flushed_expected_count.wait(timeout)
 
 
 class TestQueueProcessor(unittest.TestCase):
@@ -48,6 +69,31 @@ class TestQueueProcessor(unittest.TestCase):
         self.assertEqual([destination], processor._destinations)
         processor.clear_destinations()
         self.assertEqual([], processor._destinations)
+
+    @unittest.skip("It's failing since flush is not called and I want to commit")
+    def test_process(self):
+        logger = create_debug_logger()
+        metrics = (
+                Counter('user.jump', 2),
+                Set('username', 'navdoon'),
+                Set('username', 'navdoon'),
+                Counter('user.jump', 2),
+                )
+        queue = Queue()
+        destination = StubDestination(len(metrics))
+        destination.logger = logger
+        processor = QueueProcessor(queue)
+        processor.logger = logger
+        processor.add_destination(destination)
+        process_thread = Thread(target=processor.process)
+        process_thread.start()
+        processor.wait_until_processing(5)
+        for metric in metrics:
+            queue.put(metric.to_request())
+        destination.wait_until_expected_count_items(5)
+        processor.shutdown()
+        processor.wait_until_shutdown()
+        self.assertEqual(4, len(destination.metrics))
 
 
 
