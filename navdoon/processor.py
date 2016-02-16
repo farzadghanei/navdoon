@@ -132,13 +132,13 @@ class QueueProcessor(LoggerMixIn):
         shelf.clear()
 
         metrics = []
-        for name, value in counters.iteritems():
+        for name, value in counters.items():
             metrics.append((name, value, timestamp))
 
-        for name, value in gauges.iteritems():
+        for name, value in gauges.items():
             metrics.append((name, value, timestamp))
 
-        for name, value in sets.iteritems():
+        for name, value in sets.items():
             metrics.append((name, len(value), timestamp))
 
         return metrics
