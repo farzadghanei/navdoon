@@ -70,20 +70,19 @@ class TestQueueProcessor(unittest.TestCase):
         processor.clear_destinations()
         self.assertEqual([], processor._destinations)
 
-    @unittest.skip("It's failing since flush is not called and I want to commit")
     def test_process(self):
-        logger = create_debug_logger()
         metrics = (
                 Counter('user.jump', 2),
                 Set('username', 'navdoon'),
-                Set('username', 'navdoon'),
-                Counter('user.jump', 2),
+                Set('username', 'navdoon.test'),
+                Counter('user.jump', 4),
+                Counter('user.jump', -1),
                 )
+        expected_flushed_metrics_count = 2
         queue = Queue()
-        destination = StubDestination(len(metrics))
-        destination.logger = logger
+        destination = StubDestination()
+        destination.expected_count = expected_flushed_metrics_count
         processor = QueueProcessor(queue)
-        processor.logger = logger
         processor.add_destination(destination)
         process_thread = Thread(target=processor.process)
         process_thread.start()
@@ -93,7 +92,9 @@ class TestQueueProcessor(unittest.TestCase):
         destination.wait_until_expected_count_items(5)
         processor.shutdown()
         processor.wait_until_shutdown()
-        self.assertEqual(4, len(destination.metrics))
+        self.assertEqual(expected_flushed_metrics_count, len(destination.metrics))
+        self.assertEqual(('user.jump', 5), destination.metrics[0][0:2])
+        self.assertEqual(('username', 2), destination.metrics[1][0:2])
 
 
 

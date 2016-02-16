@@ -47,40 +47,46 @@ class QueueProcessor(LoggerMixIn):
     def process(self):
         self._log_debug("queue processor waiting for lock ...")
         with self._processing_lock:
-            self._log_debug("queue process lock aquired!")
-            stop = self._should_stop_processing
+            self._log_debug("queue process lock acquired")
             self._last_flush_timestamp = time()
-            self._log("processing the queue")
+            self._log("processing the queue ...")
+
+            queue_ = self._queue
+            QueueEmptyError = Empty
+            process = self._process_request
+            stop = self._should_stop_processing
+            log_debug = self._log_debug
+            log = self._log
+
             self._shutdown.clear()
             self._processing.set()
-            queue = self._queue
+
             try:
                 while True:
                     if stop.is_set():
-                        self._log_debug("queue processor instructed to stop")
+                        log_debug("queue processor instructed to stop")
                         break
                     try:
-                        data = queue.get(timeout=1)
-                    except Empty:
-                        continue
-                    if not data:
-                        self._log_debug("skipping empty data in queue")
-                        continue
-                    if data == self.stop_process_token:
-                        self._log("got stop process token in queue")
-                        break
-                    self._process_request(data)
+                        data = queue_.get(timeout=1)
+                    except QueueEmptyError:
+                        data = None
+
                     if time() - self._last_flush_timestamp >= self.flush_interval:
                         self.flush()
+                    if data == self.stop_process_token:
+                        log("got stop process token in queue")
+                        break
+                    if data:
+                        process(data)
             finally:
-                self._log("stopped processing the queue")
+                log("stopped processing the queue")
                 self._processing.clear()
                 self._shutdown.set()
 
     def flush(self):
         self._log_debug("queue processor waiting for flushing lock ...")
         with self._flush_lock:
-            self._log_debug("queue processor flushing lock aquired")
+            self._log_debug("queue processor flushing lock acquired")
             now = time()
             metrics = self._get_metrics_and_clear_shelf(now)
             self._log("flushing '{}' metrics to '{}' destinations".format(
@@ -125,13 +131,13 @@ class QueueProcessor(LoggerMixIn):
 
         metrics = []
         for name, value in counters.iteritems():
-            metrics.append((name, value, default_timestamp))
+            metrics.append((name, value, timestamp))
 
         for name, value in gauges.iteritems():
-            metrics.append((name, value, default_timestamp))
+            metrics.append((name, value, timestamp))
 
         for name, value in sets.iteritems():
-            metrics.append((name, value, default_timestamp))
+            metrics.append((name, len(value), timestamp))
 
         return metrics
 
