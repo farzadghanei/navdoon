@@ -85,7 +85,7 @@ class SocketServer(LoggerMixIn):
             while not stop.is_set():
                 data = receive(chunk_size)
                 if data:
-                    enqueue(data)
+                    enqueue(data.decode())
         finally:
             self._queuing_requests.clear()
 
@@ -103,7 +103,7 @@ class SocketServer(LoggerMixIn):
                     buffer = receive(buffer_size)
                     if not buffer:
                         break
-                    enqueue(buffer)
+                    enqueue(buffer.decode())
             finally:
                 conn.shutdown(shutdown_rdwr)
                 conn.close()

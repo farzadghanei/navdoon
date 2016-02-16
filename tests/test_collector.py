@@ -107,9 +107,10 @@ class TestUDPServer(SocketServerTestCaseMixIn, unittest.TestCase):
 
     def test_queue_requests(self):
         data_set = ("test message".encode(), "could be anything".encode())
+        expected_values_in_queue = tuple([data.decode() for data in data_set])
         in_queue = self.start_server_send_data_and_consume_queue(
             data_set, socket.SOCK_DGRAM)
-        self.assertEqual(data_set, in_queue)
+        self.assertEqual(expected_values_in_queue, in_queue)
 
 
 class TestTCPServer(SocketServerTestCaseMixIn, unittest.TestCase):
@@ -136,6 +137,7 @@ class TestTCPServer(SocketServerTestCaseMixIn, unittest.TestCase):
 
     def test_queue_requests(self):
         data_set = ("test message".encode(), )
+        expected_values_in_queue = tuple([data.decode() for data in data_set])
         in_queue = self.start_server_send_data_and_consume_queue(
             data_set, socket.SOCK_STREAM)
-        self.assertEqual(data_set, in_queue)
+        self.assertEqual(expected_values_in_queue, in_queue)
