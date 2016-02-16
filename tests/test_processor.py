@@ -71,14 +71,15 @@ class TestQueueProcessor(unittest.TestCase):
         self.assertEqual([], processor._destinations)
 
     def test_process(self):
+        expected_flushed_metrics_count = 2
         metrics = (
                 Counter('user.jump', 2),
                 Set('username', 'navdoon'),
                 Set('username', 'navdoon.test'),
                 Counter('user.jump', 4),
+                Set('username', 'navdoon'),
                 Counter('user.jump', -1),
                 )
-        expected_flushed_metrics_count = 2
         queue = Queue()
         destination = StubDestination()
         destination.expected_count = expected_flushed_metrics_count
@@ -93,8 +94,8 @@ class TestQueueProcessor(unittest.TestCase):
         processor.shutdown()
         processor.wait_until_shutdown()
         self.assertEqual(expected_flushed_metrics_count, len(destination.metrics))
-        self.assertEqual(('user.jump', 5), destination.metrics[0][0:2])
-        self.assertEqual(('username', 2), destination.metrics[1][0:2])
+        self.assertEqual(('user.jump', 5), destination.metrics[0][:2])
+        self.assertEqual(('username', 2), destination.metrics[1][:2])
 
 
 

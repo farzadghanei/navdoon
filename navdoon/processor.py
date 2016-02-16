@@ -57,6 +57,7 @@ class QueueProcessor(LoggerMixIn):
             stop = self._should_stop_processing
             log_debug = self._log_debug
             log = self._log
+            flush = self.flush
 
             self._shutdown.clear()
             self._processing.set()
@@ -72,7 +73,8 @@ class QueueProcessor(LoggerMixIn):
                         data = None
 
                     if time() - self._last_flush_timestamp >= self.flush_interval:
-                        self.flush()
+                        flush()
+
                     if data == self.stop_process_token:
                         log("got stop process token in queue")
                         break
