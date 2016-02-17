@@ -14,6 +14,7 @@ class QueueProcessor(LoggerMixIn):
 
     def __init__(self, queue):
         LoggerMixIn.__init__(self)
+        self.log_signature = 'queue.processor '
         self.stop_process_token = self.__class__.default_stop_process_token
         self.flush_interval = 1
         self._queue = queue
@@ -45,9 +46,9 @@ class QueueProcessor(LoggerMixIn):
         return self._processing.wait(timeout)
 
     def process(self):
-        self._log_debug("queue processor waiting for lock ...")
+        self._log_debug("waiting for lock ...")
         with self._processing_lock:
-            self._log_debug("queue process lock acquired")
+            self._log_debug("lock acquired")
             self._last_flush_timestamp = time()
             self._log("processing the queue ...")
 
@@ -65,7 +66,7 @@ class QueueProcessor(LoggerMixIn):
             try:
                 while True:
                     if stop.is_set():
-                        log_debug("queue processor instructed to stop")
+                        log_debug("instructed to shutdown")
                         break
                     try:
                         data = queue_.get(timeout=1)
@@ -78,7 +79,7 @@ class QueueProcessor(LoggerMixIn):
                     if data == self.stop_process_token:
                         log("got stop process token in queue")
                         break
-                    if data:
+                    elif data:
                         process(data)
             finally:
                 log("stopped processing the queue")
@@ -86,9 +87,9 @@ class QueueProcessor(LoggerMixIn):
                 self._shutdown.set()
 
     def flush(self):
-        self._log_debug("queue processor waiting for flushing lock ...")
+        self._log_debug("waiting for flushing lock ...")
         with self._flush_lock:
-            self._log_debug("queue processor flushing lock acquired")
+            self._log_debug("flushing lock acquired")
             now = time()
             metrics = self._get_metrics_and_clear_shelf(now)
             self._log("flushing '{}' metrics to '{}' destinations".format(
@@ -103,7 +104,7 @@ class QueueProcessor(LoggerMixIn):
             self._last_flush_timestamp = now
 
     def shutdown(self):
-        self._log("shutting down the queue processor ...")
+        self._log("shutting down ...")
         self._should_stop_processing.set()
 
     def wait_until_shutdown(self, timeout=None):

@@ -8,7 +8,8 @@ from time import sleep
 class LoggerMixIn(object):
     def __init__(self):
         self.logger = None
-        self.log_pattern = "[{pid}] {message}"
+        self.log_pattern = "{signature}{message}"
+        self.log_signature = ''
         self._pid = getpid()
 
     def _log_debug(self, msg):
@@ -21,6 +22,7 @@ class LoggerMixIn(object):
         if self.logger:
             self.logger.log(level,
                             self.log_pattern.format(message=msg,
+                                                    signature=self.log_signature,
                                                     pid=self._pid))
 
 

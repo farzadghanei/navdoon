@@ -1,6 +1,7 @@
 import unittest
 import logging
 import sys
+import time
 try:
     from queue import Queue
 except ImportError:
@@ -25,6 +26,7 @@ class DestinationWithoutFlushMethod(object):
 class StubDestination(LoggerMixIn):
     def __init__(self, expected_count = 0):
         LoggerMixIn.__init__(self)
+        self.log_signature = 'test.destination'
         self.metrics = []
         self.expected_count = expected_count
         self._flushed_expected_count = Event()
@@ -92,10 +94,44 @@ class TestQueueProcessor(unittest.TestCase):
             queue.put(metric.to_request())
         destination.wait_until_expected_count_items(5)
         processor.shutdown()
-        processor.wait_until_shutdown()
+        processor.wait_until_shutdown(5)
         self.assertEqual(expected_flushed_metrics_count, len(destination.metrics))
         self.assertEqual(('user.jump', 5), destination.metrics[0][:2])
         self.assertEqual(('username', 2), destination.metrics[1][:2])
+
+    def test_process_stops_on_stop_token_in_queue(self):
+        token = 'STOP'
+        expected_flushed_metrics_count = 2
+        metrics = (
+                Counter('user.login', 1),
+                Set('username', 'navdoon'),
+                Counter('user.login', 3),
+                token,
+                Counter('user.login', -1),
+                Counter('user.logout', 1),
+                )
+        queue = Queue()
+        destination = StubDestination()
+        destination.expected_count = expected_flushed_metrics_count
+        processor = QueueProcessor(queue)
+        processor.flush_interval = 2
+        processor.stop_process_token = token
+        processor.add_destination(destination)
+        process_thread = Thread(target=processor.process)
+        process_thread.start()
+        processor.wait_until_processing(5)
+        for metric in metrics:
+            request = token if metric is token else metric.to_request()
+            queue.put(request)
+        # make sure the processor has process the queue
+        processor.wait_until_shutdown(5)
+        # make sure at least a flush has occurred so we can test the destination
+        processor.flush()
+        self.assertFalse(processor.is_processing())
+        destination.wait_until_expected_count_items(10)
+        self.assertEqual(expected_flushed_metrics_count, len(destination.metrics))
+        self.assertEqual(('user.login', 4), destination.metrics[0][:2])
+        self.assertEqual(('username', 1), destination.metrics[1][:2])
 
 
 
