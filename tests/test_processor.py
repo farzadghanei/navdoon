@@ -1,11 +1,138 @@
 import unittest
-
+import logging
+import sys
+import time
+try:
+    from queue import Queue
+except ImportError:
+    from Queue import Queue
+from threading import Thread, Event
 from statsdmetrics import Counter, Set, Gauge, GaugeDelta
 from navdoon.processor import QueueProcessor, StatsShelf
+from navdoon.utils import LoggerMixIn
+
+
+def create_debug_logger():
+    logger = logging.Logger('navdoon.test')
+    logger.addHandler(logging.StreamHandler(sys.stderr))
+    logger.setLevel(logging.DEBUG)
+    return logger
+
+
+class DestinationWithoutFlushMethod(object):
+    pass
+
+
+class StubDestination(LoggerMixIn):
+    def __init__(self, expected_count = 0):
+        LoggerMixIn.__init__(self)
+        self.log_signature = 'test.destination'
+        self.metrics = []
+        self.expected_count = expected_count
+        self._flushed_expected_count = Event()
+
+    def flush(self, metrics):
+        self._log_debug("{} metrics flushed".format(len(metrics)))
+        self.metrics.extend(metrics)
+        if len(self.metrics) >= self.expected_count:
+            self._flushed_expected_count.set()
+
+    def wait_until_expected_count_items(self, timeout=None):
+        self._log("flush destination waiting for expected items to be flushed ...")
+        self._flushed_expected_count.wait(timeout)
 
 
 class TestQueueProcessor(unittest.TestCase):
-    pass
+
+    def test_add_destination_fails_when_flush_method_is_missing(self):
+        invalid_destinations = ["not callable", DestinationWithoutFlushMethod]
+        processor = QueueProcessor(Queue())
+        for dest in invalid_destinations:
+            self.assertRaises(ValueError, processor.add_destination, dest)
+
+    def test_add_destinations(self):
+        destination = StubDestination()
+        destination2 = StubDestination()
+        queue = Queue()
+        processor = QueueProcessor(queue)
+
+        processor.add_destination(destination)
+        processor.add_destination(destination)
+        self.assertEqual([destination], processor._destinations)
+
+        processor.add_destination(destination2)
+        self.assertEqual([destination, destination2], processor._destinations)
+
+    def test_clear_destinations(self):
+        destination = StubDestination()
+        queue = Queue()
+        processor = QueueProcessor(queue)
+        processor.add_destination(destination)
+        self.assertEqual([destination], processor._destinations)
+        processor.clear_destinations()
+        self.assertEqual([], processor._destinations)
+
+    def test_process(self):
+        expected_flushed_metrics_count = 2
+        metrics = (
+                Counter('user.jump', 2),
+                Set('username', 'navdoon'),
+                Set('username', 'navdoon.test'),
+                Counter('user.jump', 4),
+                Set('username', 'navdoon'),
+                Counter('user.jump', -1),
+                )
+        queue = Queue()
+        destination = StubDestination()
+        destination.expected_count = expected_flushed_metrics_count
+        processor = QueueProcessor(queue)
+        processor.add_destination(destination)
+        process_thread = Thread(target=processor.process)
+        process_thread.start()
+        processor.wait_until_processing(5)
+        for metric in metrics:
+            queue.put(metric.to_request())
+        destination.wait_until_expected_count_items(5)
+        processor.shutdown()
+        processor.wait_until_shutdown(5)
+        self.assertEqual(expected_flushed_metrics_count, len(destination.metrics))
+        self.assertEqual(('user.jump', 5), destination.metrics[0][:2])
+        self.assertEqual(('username', 2), destination.metrics[1][:2])
+
+    def test_process_stops_on_stop_token_in_queue(self):
+        token = 'STOP'
+        expected_flushed_metrics_count = 2
+        metrics = (
+                Counter('user.login', 1),
+                Set('username', 'navdoon'),
+                Counter('user.login', 3),
+                token,
+                Counter('user.login', -1),
+                Counter('user.logout', 1),
+                )
+        queue = Queue()
+        destination = StubDestination()
+        destination.expected_count = expected_flushed_metrics_count
+        processor = QueueProcessor(queue)
+        processor.flush_interval = 2
+        processor.stop_process_token = token
+        processor.add_destination(destination)
+        process_thread = Thread(target=processor.process)
+        process_thread.start()
+        processor.wait_until_processing(5)
+        for metric in metrics:
+            request = token if metric is token else metric.to_request()
+            queue.put(request)
+        # make sure the processor has process the queue
+        processor.wait_until_shutdown(5)
+        # make sure at least a flush has occurred so we can test the destination
+        processor.flush()
+        self.assertFalse(processor.is_processing())
+        destination.wait_until_expected_count_items(10)
+        self.assertEqual(expected_flushed_metrics_count, len(destination.metrics))
+        self.assertEqual(('user.login', 4), destination.metrics[0][:2])
+        self.assertEqual(('username', 1), destination.metrics[1][:2])
+
 
 
 class TestStatsShelf(unittest.TestCase):
