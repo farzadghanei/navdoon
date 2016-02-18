@@ -1,15 +1,15 @@
 import sys
 import logging
+from argparse import ArgumentParser
 from threading import Lock
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 from navdoon.server import Server
-from navdoon.destinations import Stream, Graphite
+from navdoon.destination import Stream, Graphite
 
 
 class App(object):
-    def __init__(self, opts, args):
-        self.opts = opts
-        self.args = args
+    def __init__(self, args):
+        self._args = self._parse_args(args)
         self._server = None
         self._run_lock = Lock()
         self._shutdown_lock = Lock()
@@ -24,14 +24,14 @@ class App(object):
 
     def create_collectors(self):
         collectors = []
-        opts = self.opts
-        if opts.get('flush-stdout'):
+        args = self._args
+        if args.get('flush-stdout'):
             collectors.append(Stream(sys.stdout))
 
-        if opts.get('flush-stderr'):
+        if args.get('flush-stderr'):
             collectors.append(Stream(sys.stderr))
 
-        if opts.get('flush-graphite'):
+        if args.get('flush-graphite'):
             collectors.append(Graphite())
 
         return collectors
@@ -57,10 +57,13 @@ class App(object):
             self._server = self.create_server()
             self._server.start()
 
+    def _parse_args(self):
+        raise NotImplemented()
+
     def _register_signal_handlers(self):
         signal(SIGINT, self._handle_signal_int)
         signal(SIGTERM, self._handle_signal_term)
-        signal(SIGTERM, self._handle_signal_hup)
+        signal(SIGHUP, self._handle_signal_hup)
 
     def shutdown(self):
         with self._shutdown_lock:
@@ -84,10 +87,10 @@ class App(object):
         self.reload()
 
 
-def main(opts, args):
-    app = App(opts, args)
+def main(args):
+    app = App(args)
     app.run()
 
 
 if __name__ == '__main__':
-    sys.exit(main([], []))
+    sys.exit(main(sys.argv))
