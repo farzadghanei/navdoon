@@ -1,22 +1,56 @@
 import sys
 import logging
-from argparse import ArgumentParser
+from argparse import ArgumentParser, FileType
 from threading import Lock
 from signal import signal, SIGINT, SIGTERM, SIGHUP
+try:
+    import ConfigParser as configparser
+except ImportError:
+    import configparser
+import navdoon
 from navdoon.server import Server
 from navdoon.destination import Stream, Graphite
 
 
+log_level_names = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')
+
+
 class App(object):
     def __init__(self, args):
-        self._args = self._parse_args(args)
+        self._config = dict()
+        self._args = args
+        self._configure(args)
         self._server = None
         self._run_lock = Lock()
         self._shutdown_lock = Lock()
         self._reload_lock = Lock()
 
     def __del__(self):
-        self._shutdown()
+        self.shutdown()
+
+    @staticmethod
+    def get_description():
+        return "{} v{}\n{}".format(
+                navdoon.__title__,
+                navdoon.__version__,
+                navdoon.__summary__
+            )
+
+    @staticmethod
+    def get_default_config():
+        return dict(
+                config=None,
+                log_level='INFO',
+                log_file=None,
+                log_stderr=False,
+                syslog=False,
+            )
+
+    def get_args(self):
+        return self._args
+
+    def get_config(self):
+        return self._config
 
     def create_logger(self):
         logger = logging.Logger('navdoon')
@@ -57,8 +91,40 @@ class App(object):
             self._server = self.create_server()
             self._server.start()
 
-    def _parse_args(self):
-        raise NotImplemented()
+    def _configure(self, args):
+        parsed_args = vars(self._parse_args(args))
+        configs = self.get_default_config()
+        if parsed_args['config'] is not None:
+            with parsed_args['config'] as config_file:
+                configs = self._parse_config_file(config_file)
+
+        for key, value in parsed_args.items():
+            if value is not None:
+                configs[key] = value
+
+        self._config = configs
+
+    def _parse_config_file(self, file_):
+        parser = configparser.SafeConfigParser()
+        parser.readfp(file_)
+        config = dict()
+        for key, value in parser.items('navdoon'):
+            if key == 'config':
+                continue
+            elif key == 'log-level' and value not in log_level_names:
+                raise ValueErorr("Invalid log level '{}' in configuration file '{}'".format(
+                    value, file_.name))
+            config[key.replace('-', '_')] = value
+        return config
+
+    def _parse_args(self, args):
+        parser = ArgumentParser(description=self.get_description())
+        parser.add_argument('-c', '--config', help='path to config file', type=FileType('r'))
+        parser.add_argument('--log-level', help='logging level', choices=log_level_names)
+        parser.add_argument('-l', '--log', help='path to log file')
+        parser.add_argument('--log-stderr', help='log to stderr')
+        parser.add_argument('--syslog', action='store_true', help='log to syslog')
+        return parser.parse_args(args)
 
     def _register_signal_handlers(self):
         signal(SIGINT, self._handle_signal_int)
@@ -75,6 +141,7 @@ class App(object):
         with self._reload_lock:
             if not self._server:
                 raise Exception("App is not running, can not reload")
+            self._configure(self.args)
             self._server.reload()
 
     def _handle_signal_int(self):

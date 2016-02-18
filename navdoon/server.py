@@ -8,7 +8,7 @@ specified destinations
 import multiprocessing
 import threading
 from time import time
-from navdoon.procssor import QueueProcessor
+from navdoon.processor import QueueProcessor
 from navdoon.utils import LoggerMixIn
 
 class Server(LoggerMixIn):

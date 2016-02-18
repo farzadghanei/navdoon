@@ -1,4 +1,5 @@
 import unittest
+from threading import Event
 from navdoon.server import Server
 from navdoon.utils import LoggerMixIn
 
