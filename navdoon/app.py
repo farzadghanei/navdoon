@@ -108,7 +108,7 @@ class App(object):
         with self._reload_lock:
             if not self._server:
                 raise Exception("App is not running, can not reload")
-            self._configure(self.args)
+            self._configure(self._args)
             logger = self._create_logger()
             destinations = self.get_destinations()
             self._close_logger()

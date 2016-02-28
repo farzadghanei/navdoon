@@ -5,19 +5,19 @@ try:
 except ImportError:
     from queue import Queue, Empty
 from navdoon.utils import LoggerMixIn
-from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer,
-                           parse_metric_from_request, normalize_metric_name)
+from statsdmetrics import (Counter, Gauge, GaugeDelta, Set,
+                           parse_metric_from_request)
 
 
 class QueueProcessor(LoggerMixIn):
     default_stop_process_token = None
 
-    def __init__(self, queue):
+    def __init__(self, queue_):
         super(QueueProcessor, self).__init__()
         self.log_signature = 'queue.processor '
         self.stop_process_token = self.__class__.default_stop_process_token
         self.flush_interval = 1
-        self._queue = queue
+        self._queue = queue_
         self._should_stop_processing = Event()
         self._processing = Event()
         self._shutdown = Event()
@@ -29,7 +29,7 @@ class QueueProcessor(LoggerMixIn):
 
     def add_destination(self, destination):
         if not hasattr(destination, 'flush') or not callable(destination.flush):
-            raise ValueError("Invalid destination for queue processor." \
+            raise ValueError("Invalid destination for queue processor."
                     "Destination should have a flush() method")
         if destination not in self._destinations:
             self._destinations.append(destination)
@@ -120,9 +120,9 @@ class QueueProcessor(LoggerMixIn):
                 break
             try:
                 metric = parse_metric_from_request(line)
-            except ValueError as e:
+            except ValueError as parse_error:
                 self._log_error(
-                    "failed to parse statsd metrics from '{}'".format(line))
+                    "failed to parse statsd metrics from '{}': {}".format(line, parse_error))
                 continue
             self._shelf.add(metric)
 

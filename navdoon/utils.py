@@ -91,12 +91,12 @@ class TCPClient(LoggerMixIn):
                 max_retry = self.max_retry
                 while True:
                     self._connection_tries += 1
-                    try:
-                        self._log_debug("connecting to {}:{} try {}/{}".format(
+                    self._log_debug("connecting to {}:{} try {}/{}".format(
                             self.host, self.port, self._connection_tries,
                             max_retry))
+                    try:
                         sock = socket.socket(socket.AF_INET,
-                                             socket.SOCK_STRAEM)
+                                             socket.SOCK_STREAM)
                         sock.connect((self.host, self.port))
                         self._log_debug("connected to {}:{}".format(self.host,
                                                                     self.port))
@@ -104,12 +104,12 @@ class TCPClient(LoggerMixIn):
                         break
                     except socket.error as err:
                         self._log_error(
-                            "failed to connect to {}:{}. {}".format(
-                                self.host, self.port, err))
+                                "failed to connect to {}:{}. {}".format(
+                                        self.host, self.port, err))
                         sock.close()
                         if max_retry and max_retry <= self._connection_tries:
                             raise IOError(
-                                "Reached maximum connection tries of '{}' to {}:{}".format(
-                                    max_retry, self.host, self.port))
+                                    "Reached maximum connection tries of '{}' to {}:{}".format(
+                                            max_retry, self.host, self.port))
                     sleep(self._sleep_between_retries * self._connection_tries)
         return self._sock

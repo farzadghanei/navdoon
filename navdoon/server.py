@@ -71,8 +71,8 @@ class Server(LoggerMixIn):
                     if time() - start_time > self.shutdown_timeout:
                         raise Exception("Server shutdown timed out when shutting down collectors")
             self._queue.put_nowait(self._queue_processor.stop_process_token)
+            processor_timeout = max(0.1, self.shutdown_timeout - (time() - start_time))
             if not process_queue:
-                processor_timeout = max(0.1, self.shutdown_timeout - (time() - start_time))
                 self._queue_processor.shutdown()
                 self._queue_processor.wait_until_shutdown(processor_timeout)
                 if self._queue_processor.is_processing():
@@ -81,14 +81,14 @@ class Server(LoggerMixIn):
 
     def _start_queue_processor(self):
         self._queue_processor.process()
-        self._queue_processor.wait_until_running(30)
+        self._queue_processor.wail_until_processing(30)
         if not self._queue_processor.is_processing():
             self._queue_processor.shutdown()
             raise Exception("Failed to start the queue processor")
 
     def _start_collectors(self):
-        self._queue_processor.procssor()
-        self._queue_processor.wait_until_running(30)
+        self._queue_processor.procss()
+        self._queue_processor.wail_until_processing(30)
         if not self._queue_processor.is_processing():
             self._queue_processor.shutdown()
             raise Exception("Failed to start the queue processor")
