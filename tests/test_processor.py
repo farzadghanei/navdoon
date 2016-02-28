@@ -24,7 +24,7 @@ class DestinationWithoutFlushMethod(object):
 
 class StubDestination(LoggerMixIn):
     def __init__(self, expected_count=0):
-        LoggerMixIn.__init__(self)
+        super(StubDestination, self).__init__()
         self.log_signature = 'test.destination'
         self.metrics = []
         self.expected_count = expected_count

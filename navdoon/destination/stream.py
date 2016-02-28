@@ -30,4 +30,4 @@ class Stream(object):
 
 class Stdout(Stream):
     def __init__(self):
-        Stream.__init__(self, sys.stdout)
+        super(Stdout, self).__init__(sys.stdout)

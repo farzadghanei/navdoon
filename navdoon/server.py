@@ -18,7 +18,7 @@ from navdoon.utils import LoggerMixIn
 
 class Server(LoggerMixIn):
     def __init__(self):
-        LoggerMixIn.__init__(self)
+        super(Server, self).__init__()
         self.shutdown_timeout = 5
         self._destinations = []
         self._collectors = []

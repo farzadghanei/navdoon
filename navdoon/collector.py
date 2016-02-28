@@ -9,7 +9,7 @@ class SocketServer(LoggerMixIn):
     default_port = 8125
 
     def __init__(self, **kargs):
-        LoggerMixIn.__init__(self)
+        super(SocketServer, self).__init__()
         self.chunk_size = 65535
         self.socket_type = socket.SOCK_DGRAM
         self.host = '127.0.0.1'

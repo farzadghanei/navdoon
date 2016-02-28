@@ -4,7 +4,7 @@ from time import time
 
 class Graphite(TCPClient):
     def __init__(self, host='localhost', port=2003):
-        TCPClient.__init__(self, host, port)
+        super(Graphite, self).__init__(host, port)
 
     def __del__(self):
         self.disconnect()

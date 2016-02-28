@@ -28,7 +28,7 @@ class LoggerMixIn(object):
 
 class TCPClient(LoggerMixIn):
     def __init__(self, host, port):
-        LoggerMixIn.__init__(self)
+        super(TCPClient, self).__init__()
         self.host = host
         self.port = port
         self.max_retry = None
@@ -60,7 +60,7 @@ class TCPClient(LoggerMixIn):
         if self._connection_tries >= self.max_retry:
             raise IOError(
                 "Reached maximum connection tries of '{}' to {}:{}".format(
-                    max_retry, self.host, self.port))
+                    self.max_retry, self.host, self.port))
         self.disconnect()
         self.connect()
 
@@ -76,11 +76,11 @@ class TCPClient(LoggerMixIn):
                     data_size, self.host, self.port))
                 sock = self._connection()
                 try:
-                    sock.sendall(data)
+                    sock.sendall(data_bytes)
                     self._log_debug("sent {} bytes to {}:{}".format(
                         data_size, self.host, self.port))
                     break
-                except socket.error:
+                except socket.error as err:
                     self._log_error("failed to send data to {}:{}. {}".format(
                         self.host, self.port, err))
                     self.reconnect()

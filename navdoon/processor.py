@@ -13,7 +13,7 @@ class QueueProcessor(LoggerMixIn):
     default_stop_process_token = None
 
     def __init__(self, queue):
-        LoggerMixIn.__init__(self)
+        super(QueueProcessor, self).__init__()
         self.log_signature = 'queue.processor '
         self.stop_process_token = self.__class__.default_stop_process_token
         self.flush_interval = 1
