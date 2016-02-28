@@ -25,7 +25,7 @@ class QueueProcessor(LoggerMixIn):
         self._flush_lock = RLock()
         self._shelf = StatsShelf()
         self._destinations = []
-        self._last_flush_timestamp = 0
+        self._last_flush_timestamp = None
 
     def add_destination(self, destination):
         if not hasattr(destination, 'flush') or not callable(destination.flush):
@@ -46,10 +46,11 @@ class QueueProcessor(LoggerMixIn):
         return self._processing.wait(timeout)
 
     def process(self):
-        self._log_debug("waiting for lock ...")
+        self._log_debug("waiting for process lock ...")
         with self._processing_lock:
-            self._log_debug("lock acquired")
-            self._last_flush_timestamp = time()
+            self._log_debug("process lock acquired")
+            if self._last_flush_timestamp is None:
+                self._last_flush_timestamp = time()
             self._log("processing the queue ...")
 
             queue_ = self._queue
