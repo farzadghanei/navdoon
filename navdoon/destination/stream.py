@@ -1,8 +1,9 @@
 import sys
 from time import time
+from navdoon.destination import AbstractDestination
 
 
-class Stream(object):
+class Stream(AbstractDestination):
     def __init__(self, file_handle):
         self._file = file_handle
         self.pattern = "{name} {value} {timestamp}"

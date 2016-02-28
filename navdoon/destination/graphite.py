@@ -1,8 +1,9 @@
 from navdoon.utils import TCPClient
 from time import time
+from navdoon.destination import AbstractDestination
 
 
-class Graphite(TCPClient):
+class Graphite(TCPClient, AbstractDestination):
     def __init__(self, host='localhost', port=2003):
         super(Graphite, self).__init__(host, port)
 

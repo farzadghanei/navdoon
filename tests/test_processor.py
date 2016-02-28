@@ -9,6 +9,7 @@ from threading import Thread, Event
 from statsdmetrics import Counter, Set, Gauge, GaugeDelta
 from navdoon.processor import QueueProcessor, StatsShelf
 from navdoon.utils import LoggerMixIn
+from navdoon.destination import AbstractDestination
 
 
 def create_debug_logger():
@@ -22,7 +23,7 @@ class DestinationWithoutFlushMethod(object):
     pass
 
 
-class StubDestination(LoggerMixIn):
+class StubDestination(LoggerMixIn, AbstractDestination):
     def __init__(self, expected_count=0):
         super(StubDestination, self).__init__()
         self.log_signature = 'test.destination'

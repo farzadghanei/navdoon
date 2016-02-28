@@ -1,4 +1,5 @@
 from typing import Dict, io, AnyStr, Iterable, Union, List
+from io import FileIO
 from logging import Logger
 from argparse import Namespace
 from navdoon.destination import Graphite, Stream, Stdout
@@ -10,8 +11,9 @@ ConfigurationValue = Union[AnyStr, float, Boolean, None]
 Configurations = Dict[AnyStr, ConfigurationValue]
 Arguments = Iterable[AnyStr]
 Destination = Union[Graphite, Stream, Stdout]
+IO = Union[io.IO, FileIO]
 
-def parse_config_file(file_: io) -> Configurations: ...
+def parse_config_file(file_: IO) -> Configurations: ...
 def main(args: Arguments) -> int: ...
 
 class App(object):

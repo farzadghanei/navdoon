@@ -7,18 +7,17 @@ except ImportError:
 
 from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer)
 from navdoon.utils import LoggerMixIn
-from navdoon.destination import Graphite, Stream, Stdout
+from navdoon.destination import AbstractDestination
 from navdoon.processor import QueueProcessor
 
 Boolean = Union[True, False]
 Metric = Union[Counter, Gauge, GaugeDelta, Set, Timer]
 Queue = Union[queue.Queue, multiprocessing.Queue]
-Destination = Union[Graphite, Stream, Stdout]
 
 
 class QueueProcessor(LoggerMixIn):
     def __init__(self, queue: Queue) -> None: ...
-    def add_destination(self, destination: Destination) -> QueueProcessor: ...
+    def add_destination(self, destination: AbstractDestination) -> QueueProcessor: ...
     def clear_destinations(self) -> QueueProcessor : ...
     def is_processing(self) -> Boolean: ...
     def wait_until_processing(self, timeout: float): ...

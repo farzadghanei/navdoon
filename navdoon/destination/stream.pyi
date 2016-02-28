@@ -1,9 +1,10 @@
 from typing import List, AnyStr, Tuple, io, Iterable
+from navdoon.destination import AbstractDestination
 
-Metrics = Iterable[Tuple(AnyStr, float, float)]
+Metrics = List[Tuple(AnyStr, float, float)]
 Lines = List[AnyStr]
 
-class Stream(object):
+class Stream(AbstractDestination):
     def __init__(self, file_handle: io) -> None: ...
     def create_output_from_metrics(self, metrics: Metrics) -> Lines: ...
     def flush(self, metrics: Metrics) -> None: ...
