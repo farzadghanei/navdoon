@@ -1,9 +1,10 @@
 from typing import AnyStr, List, Tuple
 from navdoon.utils import TCPClient
-from navdoon.destination import AbstractDestination
+from navdoon.destination.abstract import AbstractDestination
 
 Lines = List[AnyStr]
 Metrics = List[Tuple(AnyStr, float, float)]
+
 
 class Graphite(TCPClient, AbstractDestination):
     def __init__(self, host: AnyStr, port: int) -> None: ...

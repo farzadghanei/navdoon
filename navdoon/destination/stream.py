@@ -1,6 +1,6 @@
 import sys
 from time import time
-from navdoon.destination import AbstractDestination
+from navdoon.destination.abstract import AbstractDestination
 
 
 class Stream(AbstractDestination):

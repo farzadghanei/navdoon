@@ -1,6 +1,6 @@
 from navdoon.utils import TCPClient
 from time import time
-from navdoon.destination import AbstractDestination
+from navdoon.destination.abstract import AbstractDestination
 
 
 class Graphite(TCPClient, AbstractDestination):

@@ -1,4 +1,4 @@
-from typing import AnyStr, TypeVar
+from typing import AnyStr
 import socket
 
 class LoggerMixIn(object):
