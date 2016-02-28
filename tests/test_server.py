@@ -29,6 +29,5 @@ class TestServer(unittest.TestCase):
         destination1 = StubDestination()
 
         server = Server()
-        server.add_destination(destination1)
-        server.add_destination(destination1)
+        server.set_destinations([destination1])
         self.assertEqual([destination1], server._destinations)

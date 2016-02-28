@@ -8,8 +8,13 @@ specified destinations
 import multiprocessing
 import threading
 from time import time
+try:
+    import Queue as queue
+except ImportError:
+    import queue
 from navdoon.processor import QueueProcessor
 from navdoon.utils import LoggerMixIn
+
 
 class Server(LoggerMixIn):
     def __init__(self):
@@ -20,30 +25,26 @@ class Server(LoggerMixIn):
         self._queue = self._create_queue()
         self._queue_processor = QueueProcessor(self._queue)
         self._running = threading.Event()
-        self._runing_lock = threading.Lock()
+        self._running_lock = threading.Lock()
         self._shutdown_lock = threading.Lock()
 
-    def _create_queue(self):
-        return multiprocessing.Queue()
+    @staticmethod
+    def _create_queue():
+        try:
+            cpu_count = multiprocessing.cpu_count()
+        except (NotImplementedError, NotImplemented):
+            cpu_count = 1
+        return queue.Queue() if cpu_count < 2 else multiprocessing.Queue()
 
-    def add_destination(self, destination):
-        if not destination in self._destinations:
-            self._queue_processor.add_destination(destination)
-            self._destinations.append(destination)
-        return self
-
-    def add_collector(self, collector):
-        if not hasattr(collector, 'queue'):
-            raise ValueError("Collector should have a queue attribute")
-        if not hasattr(collector, 'shutdown') or not callable(collector.shutdown):
-            raise ValueError("Collector should have a shutdown method")
-        if not collector in self._collectors:
-            collector.queue = self._queue
-            self._collectors.append(collector)
+    def set_destinations(self, destinations):
+        for destination in destinations:
+            if not destination in self._destinations:
+                self._queue_processor.add_destination(destination)
+                self._destinations.append(destination)
         return self
 
     def start(self):
-        with self._runing_lock:
+        with self._running_lock:
             try:
                 if not self._collectors:
                     raise Exception("No collectors ar specified for the server")
