@@ -1,15 +1,24 @@
+"""
+navdoon.collector
+-----------------
+Define collectors, that collect Statsd requests and queue them to be
+processed by the processor.
+"""
+
 import os
 import socket
-from multiprocessing import Queue
 from threading import Event
+from multiprocessing import Queue
 from navdoon.utils import LoggerMixIn
 
 
 class SocketServer(LoggerMixIn):
+    """Collect Statsd metrics via TCP/UDP socket"""
+
     default_port = 8125
 
     def __init__(self, **kargs):
-        LoggerMixIn.__init__(self)
+        super(SocketServer, self).__init__()
         self.chunk_size = 65535
         self.socket_type = socket.SOCK_DGRAM
         self.host = '127.0.0.1'
@@ -95,15 +104,15 @@ class SocketServer(LoggerMixIn):
         queue_put_nowait = self.queue.put_nowait
         shutdown_rdwr = socket.SHUT_RDWR
 
-        def _enqueue_from_connection(conn, addr):
+        def _enqueue_from_connection(conn):
             receive = conn.recv
             enqueue = queue_put_nowait
             try:
                 while not stop.is_set():
-                    buffer = receive(buffer_size)
-                    if not buffer:
+                    buff = receive(buffer_size)
+                    if not buff:
                         break
-                    enqueue(buffer.decode())
+                    enqueue(buff.decode())
             finally:
                 conn.shutdown(shutdown_rdwr)
                 conn.close()
@@ -112,7 +121,7 @@ class SocketServer(LoggerMixIn):
             self._queuing_requests.set()
             while not stop.is_set():
                 connection, remote_address = self.socket.accept()
-                _enqueue_from_connection(connection, remote_address)
+                _enqueue_from_connection(connection)
         finally:
             self._queuing_requests.clear()
 

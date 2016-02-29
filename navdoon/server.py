@@ -1,24 +1,24 @@
 """
 navdoon.server
 --------------
-Define the server that handles Statsd requests and flushes metrics to
-specified destinations
+Define the Statsd server, that uses other components (collector, processor,
+destination) to handle Statsd requests and flushe metrics to specified
+destinations.
 """
 
-import multiprocessing
-import threading
 from time import time
-try:
-    import Queue as queue
-except ImportError:
-    import queue
-from navdoon.processor import QueueProcessor
+import threading
+import multiprocessing
+from navdoon.pystdlib import queue
 from navdoon.utils import LoggerMixIn
+from navdoon.processor import QueueProcessor
 
 
 class Server(LoggerMixIn):
+    """Statsd server"""
+
     def __init__(self):
-        LoggerMixIn.__init__(self)
+        super(Server, self).__init__()
         self.shutdown_timeout = 5
         self._destinations = []
         self._collectors = []
@@ -32,7 +32,7 @@ class Server(LoggerMixIn):
     def _create_queue():
         try:
             cpu_count = multiprocessing.cpu_count()
-        except (NotImplementedError, NotImplemented):
+        except Exception:
             cpu_count = 1
         return queue.Queue() if cpu_count < 2 else multiprocessing.Queue()
 
@@ -47,7 +47,8 @@ class Server(LoggerMixIn):
         with self._running_lock:
             try:
                 if not self._collectors:
-                    raise Exception("No collectors ar specified for the server")
+                    raise Exception(
+                        "No collectors ar specified for the server")
                 self._start_queue_processor()
                 self._start_collectors()
                 self._running.set()
@@ -63,33 +64,36 @@ class Server(LoggerMixIn):
     def shutdown(self, process_queue=True):
         with self._shutdown_lock:
             start_time = time()
-            collector_shutdown_timeout = self.shutdown_timeout / len(self._collectors)
+            collector_shutdown_timeout = self.shutdown_timeout / len(
+                self._collectors)
             if self._collectors:
                 for collector in self._collectors:
                     collector.shutdown()
                     collector.wait_until_shutdown(collector_shutdown_timeout)
                     if time() - start_time > self.shutdown_timeout:
-                        raise Exception("Server shutdown timed out when shutting down collectors")
+                        raise Exception(
+                            "Server shutdown timed out when shutting down collectors")
             self._queue.put_nowait(self._queue_processor.stop_process_token)
+            processor_timeout = max(0.1, self.shutdown_timeout -
+                                    (time() - start_time))
             if not process_queue:
-                processor_timeout = max(0.1, self.shutdown_timeout - (time() - start_time))
                 self._queue_processor.shutdown()
                 self._queue_processor.wait_until_shutdown(processor_timeout)
                 if self._queue_processor.is_processing():
-                    raise Exception("Server shutdown timedout when shutting down processor")
+                    raise Exception(
+                        "Server shutdown timedout when shutting down processor")
             self._queue_processor.wait_until_processing(processor_timeout)
 
     def _start_queue_processor(self):
         self._queue_processor.process()
-        self._queue_processor.wait_until_running(30)
+        self._queue_processor.wait_until_processing(30)
         if not self._queue_processor.is_processing():
             self._queue_processor.shutdown()
             raise Exception("Failed to start the queue processor")
 
     def _start_collectors(self):
-        self._queue_processor.procssor()
-        self._queue_processor.wait_until_running(30)
+        self._queue_processor.process()
+        self._queue_processor.wait_until_processing(30)
         if not self._queue_processor.is_processing():
             self._queue_processor.shutdown()
             raise Exception("Failed to start the queue processor")
-

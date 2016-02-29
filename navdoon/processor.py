@@ -1,23 +1,29 @@
+"""
+navdoon.processor
+-----------------
+Define queue processor, that will process the actualy Statsd requests
+queued by the collectors.
+"""
+
 from time import time
 from threading import Event, RLock, Thread
-try:
-    from Queue import Queue, Empty
-except ImportError:
-    from queue import Queue, Empty
+from navdoon.pystdlib.queue import Empty
 from navdoon.utils import LoggerMixIn
-from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer,
-                           parse_metric_from_request, normalize_metric_name)
+from statsdmetrics import (Counter, Gauge, GaugeDelta, Set,
+                           parse_metric_from_request)
 
 
 class QueueProcessor(LoggerMixIn):
+    """Process Statsd requests queued by the collectors"""
+
     default_stop_process_token = None
 
-    def __init__(self, queue):
-        LoggerMixIn.__init__(self)
+    def __init__(self, queue_):
+        super(QueueProcessor, self).__init__()
         self.log_signature = 'queue.processor '
         self.stop_process_token = self.__class__.default_stop_process_token
         self.flush_interval = 1
-        self._queue = queue
+        self._queue = queue_
         self._should_stop_processing = Event()
         self._processing = Event()
         self._shutdown = Event()
@@ -28,9 +34,10 @@ class QueueProcessor(LoggerMixIn):
         self._last_flush_timestamp = None
 
     def add_destination(self, destination):
-        if not hasattr(destination, 'flush') or not callable(destination.flush):
-            raise ValueError("Invalid destination for queue processor." \
-                    "Destination should have a flush() method")
+        if not hasattr(destination,
+                       'flush') or not callable(destination.flush):
+            raise ValueError("Invalid destination for queue processor."
+                             "Destination should have a flush() method")
         if destination not in self._destinations:
             self._destinations.append(destination)
         return self
@@ -74,7 +81,8 @@ class QueueProcessor(LoggerMixIn):
                     except QueueEmptyError:
                         data = None
 
-                    if time() - self._last_flush_timestamp >= self.flush_interval:
+                    if time(
+                    ) - self._last_flush_timestamp >= self.flush_interval:
                         flush()
 
                     if data == self.stop_process_token:
@@ -97,11 +105,14 @@ class QueueProcessor(LoggerMixIn):
                 len(metrics), len(self._destinations)))
             for destination in self._destinations:
                 try:
-                    call_destination_thread = Thread(target=destination.flush, args=[metrics])
+                    call_destination_thread = Thread(target=destination.flush,
+                                                     args=[metrics])
                     call_destination_thread.daemon = True
                     call_destination_thread.start()
                 except Exception as exp:
-                    self._log_error("error occurred while flushing to destination: {}".format(exp))
+                    self._log_error(
+                        "error occurred while flushing to destination: {}".format(
+                            exp))
             self._last_flush_timestamp = now
 
     def shutdown(self):
@@ -120,9 +131,10 @@ class QueueProcessor(LoggerMixIn):
                 break
             try:
                 metric = parse_metric_from_request(line)
-            except ValueError as e:
+            except ValueError as parse_error:
                 self._log_error(
-                    "failed to parse statsd metrics from '{}'".format(line))
+                    "failed to parse statsd metrics from '{}': {}".format(
+                        line, parse_error))
                 continue
             self._shelf.add(metric)
 
@@ -147,6 +159,7 @@ class QueueProcessor(LoggerMixIn):
 
 
 class StatsShelf(object):
+    """A container that will aggregate and accumulate metrics"""
 
     _metric_add_methods = {Counter.__name__: '_add_counter',
                            Set.__name__: '_add_set',
