@@ -6,11 +6,13 @@ The application combines all the other components into what the end user
 can use as the final product.
 """
 
+from __future__ import print_function
+
 import sys
 import logging
 import logging.handlers
 from argparse import ArgumentParser, FileType
-from threading import Lock
+from threading import RLock
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 import navdoon
 from navdoon.pystdlib import configparser
@@ -47,9 +49,9 @@ class App(object):
         self._args = args
         self._server = None
         self._logger = None
-        self._run_lock = Lock()
-        self._shutdown_lock = Lock()
-        self._reload_lock = Lock()
+        self._run_lock = RLock()
+        self._shutdown_lock = RLock()
+        self._reload_lock = RLock()
         self._configure(args)
 
     def __del__(self):
@@ -132,6 +134,10 @@ class App(object):
                 configs = parse_config_file(config_file)
 
         for key, value in parsed_args.items():
+            if key in ('log_stderr', 'log_syslog', 'flush_stdout'):
+                if key not in configs or value is True:
+                    configs[key] = value
+                continue
             if value is not None:
                 configs[key] = value
 
@@ -147,11 +153,11 @@ class App(object):
                             help='logging level',
                             choices=log_level_names)
         parser.add_argument('--log-file', help='path to log file')
-        parser.add_argument('--log-stderr', help='log to stderr')
+        parser.add_argument('--log-stderr', action='store_true', help='log to stderr')
         parser.add_argument('--log-syslog',
                             action='store_true',
                             help='log to syslog')
-        parser.add_argument('--flush-stdout', help='flush to standard output')
+        parser.add_argument('--flush-stdout', action='store_true', help='flush to standard output')
         parser.add_argument('--flush-graphite',
                             help='flush to graphite',
                             default=None)
@@ -187,18 +193,20 @@ class App(object):
 
     def _close_logger(self):
         if self._logger:
+            handlers = []
             for handler in self._logger.handlers:
                 if hasattr(handler, 'close') and callable(handler.close):
                     handler.close()
-                self._logger.removeHandler(handler)
+                handlers.append(handler)
+            map(self._logger.removeHandler, handlers)
         self._logger = None
 
 
 def main(args):
     """Entry point, setup and start the application"""
     app = App(args)
-    app.run()
+    return app.run()
 
 
 if __name__ == '__main__':
-    sys.exit(main(sys.argv))
+    sys.exit(main(sys.argv[1:]))
