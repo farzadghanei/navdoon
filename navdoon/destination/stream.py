@@ -14,7 +14,9 @@ class Stream(AbstractDestination):
         for metric in metrics:
             name, value = metric[:2]
             timestamp = len(metric) > 2 and metric[2] or time()
-            requests.append(self.pattern.format(name=name, value=value, timestamp=timestamp))
+            requests.append(self.pattern.format(name=name,
+                                                value=value,
+                                                timestamp=timestamp))
         return requests
 
     def flush(self, metrics):

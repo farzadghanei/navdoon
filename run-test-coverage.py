@@ -19,5 +19,3 @@ if __name__ == '__main__':
         subprocess.call("python setup.py test", shell=True)
     else:
         subprocess.call("coverage run setup.py test", shell=True)
-
-

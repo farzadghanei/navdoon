@@ -9,7 +9,6 @@ from navdoon.pystdlib import configparser
 from navdoon.server import Server
 from navdoon.destination import Stdout, Graphite
 
-
 log_level_names = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')
 
 
@@ -21,8 +20,9 @@ def parse_config_file(file_):
         if key == 'config':
             continue
         elif key == 'log-level' and value not in log_level_names:
-            raise ValueError("Invalid log level '{}' in configuration file '{}'".format(
-                value, file_.name))
+            raise ValueError(
+                "Invalid log level '{}' in configuration file '{}'".format(
+                    value, file_.name))
         config[key.replace('-', '_')] = value
     return config
 
@@ -44,21 +44,16 @@ class App(object):
 
     @staticmethod
     def get_description():
-        return "{} v{}\n{}".format(
-                navdoon.__title__,
-                navdoon.__version__,
-                navdoon.__summary__
-            )
+        return "{} v{}\n{}".format(navdoon.__title__, navdoon.__version__,
+                                   navdoon.__summary__)
 
     @staticmethod
     def get_default_config():
-        return dict(
-                config=None,
-                log_level='INFO',
-                log_file=None,
-                log_stderr=False,
-                syslog=False,
-            )
+        return dict(config=None,
+                    log_level='INFO',
+                    log_file=None,
+                    log_stderr=False,
+                    syslog=False, )
 
     def get_args(self):
         return self._args
@@ -79,7 +74,8 @@ class App(object):
             for graphite_address in self._config['flush_graphite'].split(','):
                 graphite_address = graphite_address.strip().split(':')
                 graphite_host = graphite_address.pop(0).strip()
-                graphite_port = graphite_address and int(graphite_address.pop()) or 2003
+                graphite_port = graphite_address and int(graphite_address.pop(
+                )) or 2003
                 destinations.append((Graphite, (graphite_host, graphite_port)))
         return destinations
 
@@ -129,13 +125,22 @@ class App(object):
 
     def _parse_args(self, args):
         parser = ArgumentParser(description=self.get_description())
-        parser.add_argument('-c', '--config', help='path to config file', type=FileType('r'))
-        parser.add_argument('--log-level', help='logging level', choices=log_level_names)
+        parser.add_argument('-c',
+                            '--config',
+                            help='path to config file',
+                            type=FileType('r'))
+        parser.add_argument('--log-level',
+                            help='logging level',
+                            choices=log_level_names)
         parser.add_argument('--log-file', help='path to log file')
         parser.add_argument('--log-stderr', help='log to stderr')
-        parser.add_argument('--log-syslog', action='store_true', help='log to syslog')
+        parser.add_argument('--log-syslog',
+                            action='store_true',
+                            help='log to syslog')
         parser.add_argument('--flush-stdout', help='flush to standard output')
-        parser.add_argument('--flush-graphite', help='flush to graphite', default=None)
+        parser.add_argument('--flush-graphite',
+                            help='flush to graphite',
+                            default=None)
         return parser.parse_args(args)
 
     def _register_signal_handlers(self):

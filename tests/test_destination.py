@@ -18,7 +18,6 @@ class TestGraphite(unittest.TestCase):
 
 
 class TestStream(unittest.TestCase):
-
     def test_create_output_from_metrics(self):
         output = StringIO()
         dest = Stream(output)
@@ -45,7 +44,8 @@ class TestStream(unittest.TestCase):
 
         metrics = [('logins', 12, 456789), ('mem', 53, 98765)]
         dest.flush(metrics)
-        self.assertEqual('"logins"=12@456789\n"mem"=53@98765\n', output.getvalue())
+        self.assertEqual('"logins"=12@456789\n"mem"=53@98765\n',
+                         output.getvalue())
 
     def test_flush_with_append(self):
         output = StringIO()

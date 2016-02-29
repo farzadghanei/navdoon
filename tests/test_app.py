@@ -6,7 +6,9 @@ from os import path
 from navdoon.app import App, parse_config_file
 from navdoon.destination import Stdout, Graphite
 
-test_config_file_path = path.join(path.join(path.dirname(__file__), 'fixtures'), 'test_config.ini')
+test_config_file_path = path.join(
+    path.join(
+        path.dirname(__file__), 'fixtures'), 'test_config.ini')
 
 
 class TestParseConfigFile(unittest.TestCase):
@@ -64,12 +66,14 @@ class TestApp(unittest.TestCase):
         self.assertEqual(1, len(destinations))
         self.assertEqual([(Graphite, ('localhost', 2003))], destinations)
 
-        app_multi_flush = App(['--config', self.config_filename, '--flush-graphite', 'example.org:2006,localhost'])
+        app_multi_flush = App(
+            ['--config', self.config_filename, '--flush-graphite',
+             'example.org:2006,localhost'])
         destinations = app_multi_flush.get_destinations()
         self.assertEqual(3, len(destinations))
         expected = [
-            (Stdout, ()),
-            (Graphite, ('example.org', 2006)),
-            (Graphite, ('localhost', 2003))
+            (Stdout, ()), (Graphite,
+                           ('example.org', 2006)), (Graphite,
+                                                    ('localhost', 2003))
         ]
         self.assertEqual(expected, destinations)

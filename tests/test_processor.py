@@ -37,12 +37,12 @@ class StubDestination(LoggerMixIn, AbstractDestination):
             self.flushed_expected_count.clear()
 
     def wait_until_expected_count_items(self, timeout=None):
-        self._log("flush destination waiting for expected items to be flushed ...")
+        self._log(
+            "flush destination waiting for expected items to be flushed ...")
         self.flushed_expected_count.wait(timeout)
 
 
 class TestQueueProcessor(unittest.TestCase):
-
     def test_add_destination_fails_when_flush_method_is_missing(self):
         invalid_destinations = ["not callable", DestinationWithoutFlushMethod]
         processor = QueueProcessor(Queue())
@@ -73,14 +73,12 @@ class TestQueueProcessor(unittest.TestCase):
 
     def test_process(self):
         expected_flushed_metrics_count = 2
-        metrics = (
-                Counter('user.jump', 2),
-                Set('username', 'navdoon'),
-                Set('username', 'navdoon.test'),
-                Counter('user.jump', 4),
-                Set('username', 'navdoon'),
-                Counter('user.jump', -1),
-                )
+        metrics = (Counter('user.jump', 2),
+                   Set('username', 'navdoon'),
+                   Set('username', 'navdoon.test'),
+                   Counter('user.jump', 4),
+                   Set('username', 'navdoon'),
+                   Counter('user.jump', -1), )
         queue_ = Queue()
         destination = StubDestination()
         destination.expected_count = expected_flushed_metrics_count
@@ -94,21 +92,20 @@ class TestQueueProcessor(unittest.TestCase):
         destination.wait_until_expected_count_items(5)
         processor.shutdown()
         processor.wait_until_shutdown(5)
-        self.assertEqual(expected_flushed_metrics_count, len(destination.metrics))
+        self.assertEqual(expected_flushed_metrics_count,
+                         len(destination.metrics))
         self.assertEqual(('user.jump', 5), destination.metrics[0][:2])
         self.assertEqual(('username', 2), destination.metrics[1][:2])
 
     def test_process_stops_on_stop_token_in_queue(self):
         token = 'STOP'
         expected_flushed_metrics_count = 2
-        metrics = (
-                Counter('user.login', 1),
-                Set('username', 'navdoon'),
-                Counter('user.login', 3),
-                token,
-                Counter('user.login', -1),
-                Counter('user.logout', 1),
-                )
+        metrics = (Counter('user.login', 1),
+                   Set('username', 'navdoon'),
+                   Counter('user.login', 3),
+                   token,
+                   Counter('user.login', -1),
+                   Counter('user.logout', 1), )
         queue_ = Queue()
         destination = StubDestination()
         destination.expected_count = expected_flushed_metrics_count
@@ -128,16 +125,14 @@ class TestQueueProcessor(unittest.TestCase):
         processor.flush()
         self.assertFalse(processor.is_processing())
         destination.wait_until_expected_count_items(10)
-        self.assertEqual(expected_flushed_metrics_count, len(destination.metrics))
+        self.assertEqual(expected_flushed_metrics_count,
+                         len(destination.metrics))
         self.assertEqual(('user.login', 4), destination.metrics[0][:2])
         self.assertEqual(('username', 1), destination.metrics[1][:2])
 
     def test_process_can_resume_after_shutdown_called(self):
-        metrics = (
-                Counter('user.login', 1),
-                Set('username', 'navdoon'),
-                Counter('user.login', 3)
-        )
+        metrics = (Counter('user.login', 1), Set('username', 'navdoon'),
+                   Counter('user.login', 3))
         queue_ = Queue()
         destination = StubDestination()
         destination.expected_count = 1
@@ -174,7 +169,8 @@ class TestQueueProcessor(unittest.TestCase):
         destination2.wait_until_expected_count_items(5)
         processor.shutdown()
         resume_process_thread.join(5)
-        self.assertGreaterEqual(expected_flushed_metrics, len(destination2.metrics))
+        self.assertGreaterEqual(expected_flushed_metrics,
+                                len(destination2.metrics))
 
 
 class TestStatsShelf(unittest.TestCase):
