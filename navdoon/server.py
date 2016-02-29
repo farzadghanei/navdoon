@@ -32,7 +32,7 @@ class Server(LoggerMixIn):
     def _create_queue():
         try:
             cpu_count = multiprocessing.cpu_count()
-        except (NotImplementedError, NotImplemented):
+        except Exception:
             cpu_count = 1
         return queue.Queue() if cpu_count < 2 else multiprocessing.Queue()
 
@@ -86,14 +86,14 @@ class Server(LoggerMixIn):
 
     def _start_queue_processor(self):
         self._queue_processor.process()
-        self._queue_processor.wail_until_processing(30)
+        self._queue_processor.wait_until_processing(30)
         if not self._queue_processor.is_processing():
             self._queue_processor.shutdown()
             raise Exception("Failed to start the queue processor")
 
     def _start_collectors(self):
-        self._queue_processor.procss()
-        self._queue_processor.wail_until_processing(30)
+        self._queue_processor.process()
+        self._queue_processor.wait_until_processing(30)
         if not self._queue_processor.is_processing():
             self._queue_processor.shutdown()
             raise Exception("Failed to start the queue processor")
