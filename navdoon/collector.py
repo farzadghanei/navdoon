@@ -1,7 +1,7 @@
 import os
 import socket
-from multiprocessing import Queue
 from threading import Event
+from multiprocessing import Queue
 from navdoon.utils import LoggerMixIn
 
 

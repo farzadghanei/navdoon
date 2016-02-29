@@ -1,12 +1,9 @@
 import unittest
 import logging
 import sys
-try:
-    from queue import Queue
-except ImportError:
-    from Queue import Queue
 from threading import Thread, Event
 from statsdmetrics import Counter, Set, Gauge, GaugeDelta
+from navdoon.pystdlib.queue import Queue
 from navdoon.processor import QueueProcessor, StatsShelf
 from navdoon.utils import LoggerMixIn
 from navdoon.destination import AbstractDestination
@@ -55,8 +52,8 @@ class TestQueueProcessor(unittest.TestCase):
     def test_add_destinations(self):
         destination = StubDestination()
         destination2 = StubDestination()
-        queue = Queue()
-        processor = QueueProcessor(queue)
+        queue_ = Queue()
+        processor = QueueProcessor(queue_)
 
         processor.add_destination(destination)
         processor.add_destination(destination)
@@ -67,8 +64,8 @@ class TestQueueProcessor(unittest.TestCase):
 
     def test_clear_destinations(self):
         destination = StubDestination()
-        queue = Queue()
-        processor = QueueProcessor(queue)
+        queue_ = Queue()
+        processor = QueueProcessor(queue_)
         processor.add_destination(destination)
         self.assertEqual([destination], processor._destinations)
         processor.clear_destinations()
@@ -84,16 +81,16 @@ class TestQueueProcessor(unittest.TestCase):
                 Set('username', 'navdoon'),
                 Counter('user.jump', -1),
                 )
-        queue = Queue()
+        queue_ = Queue()
         destination = StubDestination()
         destination.expected_count = expected_flushed_metrics_count
-        processor = QueueProcessor(queue)
+        processor = QueueProcessor(queue_)
         processor.add_destination(destination)
         process_thread = Thread(target=processor.process)
         process_thread.start()
         processor.wait_until_processing(5)
         for metric in metrics:
-            queue.put(metric.to_request())
+            queue_.put(metric.to_request())
         destination.wait_until_expected_count_items(5)
         processor.shutdown()
         processor.wait_until_shutdown(5)
@@ -112,10 +109,10 @@ class TestQueueProcessor(unittest.TestCase):
                 Counter('user.login', -1),
                 Counter('user.logout', 1),
                 )
-        queue = Queue()
+        queue_ = Queue()
         destination = StubDestination()
         destination.expected_count = expected_flushed_metrics_count
-        processor = QueueProcessor(queue)
+        processor = QueueProcessor(queue_)
         processor.flush_interval = 2
         processor.stop_process_token = token
         processor.add_destination(destination)
@@ -124,7 +121,7 @@ class TestQueueProcessor(unittest.TestCase):
         processor.wait_until_processing(5)
         for metric in metrics:
             request = token if metric is token else metric.to_request()
-            queue.put(request)
+            queue_.put(request)
         # make sure the processor has process the queue
         processor.wait_until_shutdown(5)
         # make sure at least a flush has occurred so we can test the destination
@@ -141,11 +138,11 @@ class TestQueueProcessor(unittest.TestCase):
                 Set('username', 'navdoon'),
                 Counter('user.login', 3)
         )
-        queue = Queue()
+        queue_ = Queue()
         destination = StubDestination()
         destination.expected_count = 1
 
-        processor = QueueProcessor(queue)
+        processor = QueueProcessor(queue_)
         processor.flush_interval = 1
         processor.add_destination(destination)
         process_thread = Thread(target=processor.process)
@@ -153,17 +150,17 @@ class TestQueueProcessor(unittest.TestCase):
         processor.wait_until_processing(5)
 
         for metric in metrics:
-            queue.put(metric.to_request())
+            queue_.put(metric.to_request())
 
         destination.wait_until_expected_count_items(5)
         processor.shutdown()
         process_thread.join(5)
         self.assertGreaterEqual(len(destination.metrics), 1)
-        self.assertLessEqual(queue.qsize(), 2)
+        self.assertLessEqual(queue_.qsize(), 2)
         processor.clear_destinations()
 
         for metric in metrics:
-            queue.put(metric.to_request())
+            queue_.put(metric.to_request())
 
         expected_flushed_metrics = len(metrics)
         destination2 = StubDestination()

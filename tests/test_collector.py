@@ -4,10 +4,7 @@ import threading
 import unittest
 import logging
 import gc
-try:
-    from Queue import Empty
-except ImportError:
-    from queue import Empty
+from navdoon.pystdlib.queue import Empty
 from navdoon.collector import SocketServer
 
 
@@ -25,11 +22,11 @@ def find_open_port(host, sock_type):
     return port
 
 
-def consume_queue(queue, count, timeout=1):
+def consume_queue(queue_, count, timeout=1):
     consumed = []
     for i in range(count):
         try:
-            consumed.append(queue.get(True, timeout))
+            consumed.append(queue_.get(True, timeout))
         except Empty:
             break
     return tuple(consumed)

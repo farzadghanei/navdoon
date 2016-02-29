@@ -4,11 +4,8 @@ import logging.handlers
 from argparse import ArgumentParser, FileType
 from threading import Lock
 from signal import signal, SIGINT, SIGTERM, SIGHUP
-try:
-    import ConfigParser as configparser
-except ImportError:
-    import configparser
 import navdoon
+from navdoon.pystdlib import configparser
 from navdoon.server import Server
 from navdoon.destination import Stdout, Graphite
 

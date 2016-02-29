@@ -5,15 +5,12 @@ Define the server that handles Statsd requests and flushes metrics to
 specified destinations
 """
 
-import multiprocessing
-import threading
 from time import time
-try:
-    import Queue as queue
-except ImportError:
-    import queue
-from navdoon.processor import QueueProcessor
+import threading
+import multiprocessing
+from navdoon.pystdlib import queue
 from navdoon.utils import LoggerMixIn
+from navdoon.processor import QueueProcessor
 
 
 class Server(LoggerMixIn):

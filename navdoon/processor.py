@@ -1,9 +1,6 @@
 from time import time
 from threading import Event, RLock, Thread
-try:
-    from Queue import Queue, Empty
-except ImportError:
-    from queue import Queue, Empty
+from navdoon.pystdlib.queue import Queue, Empty
 from navdoon.utils import LoggerMixIn
 from statsdmetrics import (Counter, Gauge, GaugeDelta, Set,
                            parse_metric_from_request)
