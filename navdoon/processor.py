@@ -1,3 +1,10 @@
+"""
+navdoon.processor
+-----------------
+Define queue processor, that will process the actualy Statsd requests
+queued by the collectors.
+"""
+
 from time import time
 from threading import Event, RLock, Thread
 from navdoon.pystdlib.queue import Queue, Empty
@@ -7,6 +14,8 @@ from statsdmetrics import (Counter, Gauge, GaugeDelta, Set,
 
 
 class QueueProcessor(LoggerMixIn):
+    """Process Statsd requests queued by the collectors"""
+
     default_stop_process_token = None
 
     def __init__(self, queue_):
@@ -150,6 +159,7 @@ class QueueProcessor(LoggerMixIn):
 
 
 class StatsShelf(object):
+    """A container that will aggregate and accumulate metrics"""
 
     _metric_add_methods = {Counter.__name__: '_add_counter',
                            Set.__name__: '_add_set',

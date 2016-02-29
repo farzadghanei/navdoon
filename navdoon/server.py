@@ -1,8 +1,9 @@
 """
 navdoon.server
 --------------
-Define the server that handles Statsd requests and flushes metrics to
-specified destinations
+Define the Statsd server, that uses other components (collector, processor,
+destination) to handle Statsd requests and flushe metrics to specified
+destinations.
 """
 
 from time import time
@@ -14,6 +15,8 @@ from navdoon.processor import QueueProcessor
 
 
 class Server(LoggerMixIn):
+    """Statsd server"""
+
     def __init__(self):
         super(Server, self).__init__()
         self.shutdown_timeout = 5

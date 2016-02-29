@@ -1,3 +1,10 @@
+"""
+navdoon.collector
+-----------------
+Define collectors, that collect Statsd requests and queue them to be
+processed by the processor.
+"""
+
 import os
 import socket
 from threading import Event
@@ -6,6 +13,8 @@ from navdoon.utils import LoggerMixIn
 
 
 class SocketServer(LoggerMixIn):
+    """Collect Statsd metrics via TCP/UDP socket"""
+
     default_port = 8125
 
     def __init__(self, **kargs):

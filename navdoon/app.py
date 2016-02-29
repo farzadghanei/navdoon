@@ -1,3 +1,11 @@
+"""
+navdoon.app
+-----------
+Define the application, what is executed and handles interations and signals.
+The application combines all the other components into what the end user
+can use as the final product.
+"""
+
 import sys
 import logging
 import logging.handlers
@@ -13,6 +21,8 @@ log_level_names = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')
 
 
 def parse_config_file(file_):
+    """Parse app configurations from contents of a file"""
+
     parser = configparser.SafeConfigParser()
     parser.readfp(file_)
     config = dict()
@@ -28,6 +38,10 @@ def parse_config_file(file_):
 
 
 class App(object):
+    """Navdoon application, configure and use the components based on the
+    provided arguments and configurations.
+    """
+
     def __init__(self, args):
         self._config = dict()
         self._args = args
@@ -181,6 +195,7 @@ class App(object):
 
 
 def main(args):
+    """Entry point, setup and start the application"""
     app = App(args)
     app.run()
 

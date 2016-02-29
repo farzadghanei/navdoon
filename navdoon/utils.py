@@ -1,3 +1,9 @@
+"""
+navdoon.utils
+-------------
+Commont utilities and mixin classes
+"""
+
 import socket
 from os import getpid
 from logging import INFO, DEBUG, ERROR
@@ -6,6 +12,8 @@ from time import sleep
 
 
 class LoggerMixIn(object):
+    """A MixIn class for anything that needs to log messages"""
+
     def __init__(self):
         self.logger = None
         self.log_pattern = "{signature}{message}"
@@ -28,6 +36,8 @@ class LoggerMixIn(object):
 
 
 class TCPClient(LoggerMixIn):
+    """A generic TCP client with reconnecting feature"""
+
     def __init__(self, host, port):
         super(TCPClient, self).__init__()
         self.host = host
