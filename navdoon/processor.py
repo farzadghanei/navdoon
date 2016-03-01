@@ -20,6 +20,10 @@ def validate_destinations(destinations):
             raise ValueError("Invalid destination for queue processor."
                              "Destination should have a flush() method")
 
+def validate_queue(queue_):
+    if not callable(getattr(queue_, 'get', None)):
+        raise ValueError("Invalid queue for queue processor."
+                         "queue should have a get() method")
 
 class QueueProcessor(LoggerMixIn):
     """Process Statsd requests queued by the collectors"""
@@ -27,6 +31,7 @@ class QueueProcessor(LoggerMixIn):
     default_stop_process_token = None
 
     def __init__(self, queue_):
+        validate_queue(queue_)
         super(QueueProcessor, self).__init__()
         self.log_signature = 'queue.processor '
         self.stop_process_token = self.__class__.default_stop_process_token
@@ -40,6 +45,17 @@ class QueueProcessor(LoggerMixIn):
         self._shelf = StatsShelf()
         self._destinations = []
         self._last_flush_timestamp = None
+
+    @property
+    def queue(self):
+        return self._queue
+
+    @queue.setter
+    def queue(self, queue_):
+        validate_queue(queue_)
+        if self.is_processing():
+            raise Exception("Can not change queue processor's queue while processing")
+        self._queue = queue_
 
     def add_destination(self, destination):
         validate_destinations([destination])

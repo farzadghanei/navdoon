@@ -43,6 +43,27 @@ class StubDestination(LoggerMixIn, AbstractDestination):
 
 
 class TestQueueProcessor(unittest.TestCase):
+    """Test processor.QueueProcessor class"""
+
+    def test_processor_does_not_accept_invalid_queue(self):
+        self.assertRaises(ValueError, QueueProcessor, "not a queue")
+        self.assertRaises(ValueError, QueueProcessor, 100)
+
+        processor = QueueProcessor(Queue())
+        def set_queue(value):
+            processor.queue = value
+        self.assertRaises(ValueError, set_queue, "not a queue")
+        self.assertRaises(ValueError, set_queue, 100)
+
+    def test_set_the_queue(self):
+        queue_ = Queue()
+        processor = QueueProcessor(queue_)
+        self.assertEqual(queue_, processor.queue)
+
+        next_queue = Queue()
+        processor.queue = next_queue
+        self.assertEqual(next_queue, processor.queue)
+
     def test_add_destination_fails_when_flush_method_is_missing(self):
         invalid_destinations = ["not callable", DestinationWithoutFlushMethod]
         processor = QueueProcessor(Queue())
@@ -171,6 +192,26 @@ class TestQueueProcessor(unittest.TestCase):
         resume_process_thread.join(5)
         self.assertGreaterEqual(expected_flushed_metrics,
                                 len(destination2.metrics))
+
+    def test_queue_can_only_change_when_not_processing(self):
+        processor = QueueProcessor(Queue())
+        orig_queue = processor.queue
+        process_thread = Thread(target=processor.process)
+        process_thread.start()
+        processor.wait_until_processing(5)
+
+        def set_queue(new_queue):
+            processor.queue = new_queue
+
+        new_queue = Queue()
+        self.assertRaises(Exception, set_queue, new_queue)
+        self.assertEqual(orig_queue, processor.queue)
+
+        processor.shutdown()
+        processor.wait_until_shutdown(5)
+
+        processor.queue = new_queue
+        self.assertEqual(new_queue, processor.queue)
 
 
 class TestStatsShelf(unittest.TestCase):
