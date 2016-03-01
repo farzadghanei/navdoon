@@ -6,7 +6,7 @@ destination) to handle Statsd requests and flushe metrics to specified
 destinations.
 """
 
-from time import time
+from time import time, sleep
 from threading import Thread, RLock, Event
 import multiprocessing
 from navdoon.pystdlib import queue
@@ -30,6 +30,7 @@ class Server(LoggerMixIn):
         self._queue = self._create_queue()
         self._queue_processor = QueueProcessor(self._queue)
         self._running = Event()
+        self._shutdown = Event()
         self._running_lock = RLock()
         self._shutdown_lock = RLock()
 
@@ -63,8 +64,8 @@ class Server(LoggerMixIn):
                 for thread in collector_threads:
                     thread.join()
             finally:
-                self._running.clear()
                 queue_proc.join()
+                self._running.clear()
 
     def is_running(self):
         return self._running.is_set()
@@ -94,7 +95,17 @@ class Server(LoggerMixIn):
                 if self._queue_processor.is_processing():
                     raise Exception(
                         "Server shutdown timedout when shutting down processor")
+            self._shutdown.set()
 
+    def wait_until_shutdown(self, timeout=None):
+        start = time()
+        self._shutdown.wait(timeout)
+        while True:
+            if not self._running.is_set():
+                break
+            if timeout is not None and time() - start > timeout:
+                raise Exception("Servert shutdown timedout")
+            sleep(0.5)
 
     def _start_queue_processor(self):
         if self._use_multiprocessing():
@@ -121,3 +132,4 @@ class Server(LoggerMixIn):
             thread.start()
             collector.wait_until_queuing_requests()
         return collector_threads
+

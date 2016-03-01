@@ -74,7 +74,7 @@ class TestServer(unittest.TestCase):
         server.set_destinations([StubDestination()])
         self.assertRaises(Exception, server.start)
 
-    def test_start(self):
+    def test_start_and_shutdown(self):
         server = Server()
         dest = StubDestination()
         server.set_destinations([dest])
@@ -87,3 +87,6 @@ class TestServer(unittest.TestCase):
         server.wait_until_running(5)
         self.assertTrue(server.is_running())
         server.shutdown()
+        server.wait_until_shutdown(5)
+        self.assertFalse(server.is_running())
+        self.assertFalse(server_thread.isAlive())
