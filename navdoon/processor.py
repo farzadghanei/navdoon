@@ -13,6 +13,14 @@ from statsdmetrics import (Counter, Gauge, GaugeDelta, Set,
                            parse_metric_from_request)
 
 
+def validate_destinations(destinations):
+    for destination in destinations:
+        if not hasattr(destination,
+                       'flush') or not callable(destination.flush):
+            raise ValueError("Invalid destination for queue processor."
+                             "Destination should have a flush() method")
+
+
 class QueueProcessor(LoggerMixIn):
     """Process Statsd requests queued by the collectors"""
 
@@ -34,16 +42,18 @@ class QueueProcessor(LoggerMixIn):
         self._last_flush_timestamp = None
 
     def add_destination(self, destination):
-        if not hasattr(destination,
-                       'flush') or not callable(destination.flush):
-            raise ValueError("Invalid destination for queue processor."
-                             "Destination should have a flush() method")
+        validate_destinations([destination])
         if destination not in self._destinations:
             self._destinations.append(destination)
         return self
 
     def clear_destinations(self):
         self._destinations = []
+        return self
+
+    def set_destinations(self, destinations):
+        validate_destinations(destinations)
+        self._destinations = destinations
         return self
 
     def is_processing(self):

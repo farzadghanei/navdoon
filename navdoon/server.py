@@ -21,7 +21,6 @@ class Server(LoggerMixIn):
     def __init__(self):
         super(Server, self).__init__()
         self.shutdown_timeout = 5
-        self._destinations = []
         self._collectors = []
         self._queue = self._create_queue()
         self._queue_processor = QueueProcessor(self._queue)
@@ -39,10 +38,7 @@ class Server(LoggerMixIn):
         return multiprocessing.Queue() if cls._use_multiprocessing() else queue.Queue()
 
     def set_destinations(self, destinations):
-        for destination in destinations:
-            if not destination in self._destinations:
-                self._queue_processor.add_destination(destination)
-                self._destinations.append(destination)
+        self._queue_processor.set_destinations(destinations)
         return self
 
     def start(self):
@@ -109,11 +105,10 @@ class Server(LoggerMixIn):
         return queue_process
 
     def _start_collector_threads(self):
-        with self._running_lock:
-            collector_threads = []
-            for collector in self._collectors:
-                thread = Thread(target=collector.serve)
-                collector_threads.append(thread)
-                thread.start()
-                collector.wait_until_queuing_requests()
-            return collector_threads
+        collector_threads = []
+        for collector in self._collectors:
+            thread = Thread(target=collector.serve)
+            collector_threads.append(thread)
+            thread.start()
+            collector.wait_until_queuing_requests()
+        return collector_threads

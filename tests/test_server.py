@@ -25,9 +25,4 @@ class StubDestination(LoggerMixIn):
 
 
 class TestServer(unittest.TestCase):
-    def test_add_destinations(self):
-        destination1 = StubDestination()
-
-        server = Server()
-        server.set_destinations([destination1])
-        self.assertEqual([destination1], server._destinations)
+    pass
