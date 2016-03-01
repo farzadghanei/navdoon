@@ -27,6 +27,7 @@ class Server(LoggerMixIn):
 
     def __init__(self):
         super(Server, self).__init__()
+        self.log_signature = 'server'
         self._collectors = []
         self._queue = self._create_queue()
         self._queue_processor = QueueProcessor(self._queue)
@@ -35,15 +36,16 @@ class Server(LoggerMixIn):
         self._running_lock = RLock()
         self._shutdown_lock = RLock()
 
-    @staticmethod
-    def _use_multiprocessing():
-        #return available_cpus() > 1
-        return False
+    @property
+    def flush_interval(self):
+        return self._queue_processor.flush_interval
 
-    @classmethod
-    def _create_queue(cls):
-        return multiprocessing.Queue() if cls._use_multiprocessing(
-        ) else queue.Queue()
+    @flush_interval.setter
+    def flush_interval(self, interval):
+        flush_interval = float(interval)
+        if flush_interval <= 0:
+            raise ValueError("Invalid flush interval. Interval should be a positive number")
+        self._queue_processor.flush_interval = flush_interval
 
     def set_destinations(self, destinations):
         self._queue_processor.set_destinations(destinations)
@@ -93,6 +95,16 @@ class Server(LoggerMixIn):
             if timeout is not None and time() - start > timeout:
                 raise Exception("Servert shutdown timedout")
             sleep(0.5)
+
+    @staticmethod
+    def _use_multiprocessing():
+        #return available_cpus() > 1
+        return False
+
+    @classmethod
+    def _create_queue(cls):
+        return multiprocessing.Queue() if cls._use_multiprocessing(
+        ) else queue.Queue()
 
     def _start_queue_processor(self):
         if self._use_multiprocessing():

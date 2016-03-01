@@ -73,6 +73,23 @@ class TestServer(unittest.TestCase):
         server.set_destinations([StubDestination()])
         self.assertRaises(Exception, server.start)
 
+    def test_set_flush_interval_accepts_positive_numbers(self):
+        server = Server()
+        server.flush_interval = 103
+        self.assertEquals(103, server.flush_interval)
+        server.flush_interval = 0.58
+        self.assertEquals(0.58, server.flush_interval)
+
+    def test_set_flush_interval_fails_on_not_positive_numbers(self):
+        server = Server()
+
+        def set_interval(value):
+            server.flush_interval = value
+
+        self.assertRaises(ValueError, set_interval, 0)
+        self.assertRaises(ValueError, set_interval, -10)
+        self.assertRaises(ValueError, set_interval, "not a number")
+
     def test_start_and_shutdown(self):
         server = Server()
         dest = StubDestination()
@@ -89,3 +106,4 @@ class TestServer(unittest.TestCase):
         server.wait_until_shutdown(5)
         self.assertFalse(server.is_running())
         self.assertFalse(server_thread.isAlive())
+
