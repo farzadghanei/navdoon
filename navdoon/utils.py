@@ -6,9 +6,18 @@ Commont utilities and mixin classes
 
 import socket
 from os import getpid
+from time import sleep
 from logging import INFO, DEBUG, ERROR
 from threading import Lock
-from time import sleep
+from multiprocessing import cpu_count
+
+
+def available_cpus():
+    try:
+        cpus = cpu_count()
+    except Exception:
+        cpus = 1
+    return cpus
 
 
 class LoggerMixIn(object):

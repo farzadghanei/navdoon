@@ -10,16 +10,9 @@ from time import time
 from threading import Thread, RLock, Event
 import multiprocessing
 from navdoon.pystdlib import queue
-from navdoon.utils import LoggerMixIn
+from navdoon.utils import LoggerMixIn, available_cpus
 from navdoon.processor import QueueProcessor
 
-
-def cpu_count():
-    try:
-        cpu_count = multiprocessing.cpu_count()
-    except Exception:
-        cpu_count = 1
-    return cpu_count
 
 
 class Server(LoggerMixIn):
@@ -38,7 +31,7 @@ class Server(LoggerMixIn):
 
     @staticmethod
     def _use_multiprocessing():
-        #return cpu_count() > 1
+        #return available_cpus() > 1
         return False
 
     @classmethod
