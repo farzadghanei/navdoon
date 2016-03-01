@@ -7,18 +7,57 @@ processed by the processor.
 
 import os
 import socket
+from abc import abstractmethod, ABCMeta
 from threading import Event
-from multiprocessing import Queue
+from navdoon.pystdlib.queue import Queue
 from navdoon.utils import LoggerMixIn
 
 
-class SocketServer(LoggerMixIn):
+class AbstractCollector(object):
+    """Abstract base class for collectors"""
+
+    __metaclass__ = ABCMeta
+
+    def __init__(self):
+        self._queue = Queue()
+
+    @abstractmethod
+    def start(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def wait_until_queuing_requests(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def shutdown(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def wait_until_shutdown(self):
+        raise NotImplementedError
+
+    @property
+    def queue(self):
+        return self._queue
+
+    @queue.setter
+    def queue(self, queue_):
+        for method in ('put_nowait',):
+            if not callable(getattr(queue_, method, None)):
+                raise ValueError("Invalid queue for collector. Queue is missing method '{}'".format(method))
+        self._queue = queue_
+        return self
+
+
+class SocketServer(LoggerMixIn, AbstractCollector):
     """Collect Statsd metrics via TCP/UDP socket"""
 
     default_port = 8125
 
     def __init__(self, **kargs):
-        super(SocketServer, self).__init__()
+        AbstractCollector.__init__(self)
+        LoggerMixIn.__init__(self)
         self.chunk_size = 65535
         self.socket_type = socket.SOCK_DGRAM
         self.host = '127.0.0.1'
@@ -26,7 +65,6 @@ class SocketServer(LoggerMixIn):
         self.user = None
         self.group = None
         self.socket = None
-        self.queue = Queue()
         self._stop_queuing_requests = Event()
         self._queuing_requests = Event()
         self._shutdown = Event()
@@ -47,7 +85,7 @@ class SocketServer(LoggerMixIn):
                 configured.append(key)
         return configured
 
-    def serve(self):
+    def start(self):
         self._bind_socket()
         try:
             while not self._should_shutdown.is_set():
@@ -55,12 +93,12 @@ class SocketServer(LoggerMixIn):
                 self._log("starting serving requests on {} {}:{}".format(
                     self.socket_type == socket.SOCK_STREAM and 'TCP' or 'UDP',
                     self.host, self.port))
-                self._pre_serve()
+                self._pre_start()
                 if self.socket_type == socket.SOCK_STREAM:
                     self._queue_requests_tcp()
                 else:
                     self._queue_requests_udp()
-                self._post_serve()
+                self._post_start()
                 self._log("stopped serving requests")
         finally:
             self._do_shutdown()
@@ -79,7 +117,7 @@ class SocketServer(LoggerMixIn):
     def wait_until_shutdown(self, timeout=None):
         self._shutdown.wait(timeout)
 
-    def _pre_serve(self):
+    def _pre_start(self):
         pass
 
     def _queue_requests_udp(self):
@@ -87,7 +125,7 @@ class SocketServer(LoggerMixIn):
         chunk_size = self.chunk_size
         sock = self.socket
         receive = sock.recv
-        enqueue = self.queue.put_nowait
+        enqueue = self._queue.put_nowait
 
         try:
             self._queuing_requests.set()
@@ -101,7 +139,7 @@ class SocketServer(LoggerMixIn):
     def _queue_requests_tcp(self):
         stop = self._stop_queuing_requests
         buffer_size = self.chunk_size
-        queue_put_nowait = self.queue.put_nowait
+        queue_put_nowait = self._queue.put_nowait
         shutdown_rdwr = socket.SHUT_RDWR
 
         def _enqueue_from_connection(conn):
@@ -125,23 +163,12 @@ class SocketServer(LoggerMixIn):
         finally:
             self._queuing_requests.clear()
 
-    def _post_serve(self):
+    def _post_start(self):
         pass
 
     def _do_shutdown(self, join_queue=True):
         self._close_socket()
-        self._close_queue(join_queue)
         self._shutdown.set()
-
-    def _close_queue(self, join=True):
-        queue = self.queue
-        if queue:
-            queue.close()
-            if join:
-                queue.join_thread()
-            else:
-                queue.cancel_join_thread()
-        self.queue = None
 
     def _bind_socket(self, sock=None):
         if not sock:

@@ -4,7 +4,7 @@ import threading
 import unittest
 import logging
 import gc
-from navdoon.pystdlib.queue import Empty
+from navdoon.pystdlib.queue import Empty, Queue
 from navdoon.collector import SocketServer
 
 
@@ -54,7 +54,7 @@ class SocketServerTestCaseMixIn(object):
         self.server.socket_type = socket_type
         self.server.host = self.host
         self.server.port = self.port
-        self.server_thread = threading.Thread(target=self.server.serve)
+        self.server_thread = threading.Thread(target=self.server.start)
         self.server_thread.daemon = True
 
     def start_server_send_data_and_consume_queue(self, data_set, socket_type):
@@ -101,6 +101,14 @@ class TestUDPServer(SocketServerTestCaseMixIn, unittest.TestCase):
         self.assertEqual(self.server.port, 1234)
         self.assertEqual(self.server.user, 'someuser')
         self.assertEqual(self.server.group, 'somegroup')
+
+    def test_get_set_queue(self):
+        def set_queue(queue_):
+            self.server.queue = queue_
+        self.assertRaises(ValueError, set_queue, "not a queue")
+        queue = Queue()
+        self.server.queue = queue
+        self.assertEqual(queue, self.server.queue)
 
     def test_queue_requests(self):
         data_set = ("test message".encode(), "could be anything".encode())
