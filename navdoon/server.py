@@ -10,9 +10,15 @@ from time import time
 from threading import Thread, RLock, Event
 import multiprocessing
 from navdoon.pystdlib import queue
+from navdoon.collector import AbstractCollector
 from navdoon.utils import LoggerMixIn, available_cpus
 from navdoon.processor import QueueProcessor
 
+
+def validate_collectors(collectors):
+    for collector in collectors:
+        if not isinstance(collector, AbstractCollector):
+            raise ValueError("Invalid collector. Collectors should extend AbstractCollector")
 
 
 class Server(LoggerMixIn):
@@ -20,7 +26,6 @@ class Server(LoggerMixIn):
 
     def __init__(self):
         super(Server, self).__init__()
-        self.shutdown_timeout = 5
         self._collectors = []
         self._queue = self._create_queue()
         self._queue_processor = QueueProcessor(self._queue)
@@ -39,6 +44,11 @@ class Server(LoggerMixIn):
 
     def set_destinations(self, destinations):
         self._queue_processor.set_destinations(destinations)
+        return self
+
+    def set_collectors(self, collectors):
+        validate_collectors(collectors)
+        self._collectors = collectors
         return self
 
     def start(self):
@@ -62,30 +72,29 @@ class Server(LoggerMixIn):
     def wait_until_running(self, timeout=None):
         self._running.wait(timeout)
 
-    def shutdown(self, process_queue=True):
+    def shutdown(self, process_queue=True, timeout=None):
         with self._shutdown_lock:
             start_time = time()
             if self._collectors:
-                collector_shutdown_timeout = self.shutdown_timeout / len(
-                        self._collectors)
+                collector_timeout = timeout / len(self._collectors) if timeout else None
                 for collector in self._collectors:
                     collector.shutdown()
-                    collector.wait_until_shutdown(collector_shutdown_timeout)
-                    if time() - start_time > self.shutdown_timeout:
+                    collector.wait_until_shutdown(collector_timeout)
+                    if timeout is not None and time() - start_time > timeout:
                         raise Exception(
                             "Server shutdown timed out when shutting down collectors")
-            self._queue.put_nowait(self._queue_processor.stop_process_token)
-            processor_timeout = max(0.1, self.shutdown_timeout -
-                                    (time() - start_time))
 
             if self._queue_processor.is_processing():
+                self._queue.put_nowait(self._queue_processor.stop_process_token)
+                processor_timeout = max(0.1, timeout -
+                                        (time() - start_time)) if timeout else None
                 if not process_queue:
                     self._queue_processor.shutdown()
-                    self._queue_processor.wait_until_shutdown(processor_timeout)
-                    if self._queue_processor.is_processing():
-                        raise Exception(
-                            "Server shutdown timedout when shutting down processor")
-                self._queue_processor.wait_until_processing(processor_timeout)
+                self._queue_processor.wait_until_shutdown(processor_timeout)
+                if self._queue_processor.is_processing():
+                    raise Exception(
+                        "Server shutdown timedout when shutting down processor")
+
 
     def _start_queue_processor(self):
         if self._use_multiprocessing():
@@ -107,7 +116,7 @@ class Server(LoggerMixIn):
     def _start_collector_threads(self):
         collector_threads = []
         for collector in self._collectors:
-            thread = Thread(target=collector.serve)
+            thread = Thread(target=collector.start)
             collector_threads.append(thread)
             thread.start()
             collector.wait_until_queuing_requests()
