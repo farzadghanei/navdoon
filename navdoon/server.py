@@ -80,10 +80,10 @@ class Server(LoggerMixIn):
         with self._shutdown_lock:
             start_time = time()
             self._shutdown_collectors(timeout)
-
             if self._queue_processor.is_processing():
                 self._shutdown_queue_processor(process_queue, max(0.1, timeout - (time(
                 ) - start_time)) if timeout else None)
+            self._close_queue()
             self._shutdown.set()
 
     def wait_until_shutdown(self, timeout=None):
@@ -105,6 +105,13 @@ class Server(LoggerMixIn):
     def _create_queue(cls):
         return multiprocessing.Queue() if cls._use_multiprocessing(
         ) else queue.Queue()
+
+    def _close_queue(self):
+        queue = self._queue
+        if queue:
+            if callable(getattr(queue, 'close', None)):
+                queue.close()
+        self._queue = None
 
     def _start_queue_processor(self):
         if self._use_multiprocessing():
