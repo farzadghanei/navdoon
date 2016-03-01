@@ -18,7 +18,8 @@ from navdoon.processor import QueueProcessor
 def validate_collectors(collectors):
     for collector in collectors:
         if not isinstance(collector, AbstractCollector):
-            raise ValueError("Invalid collector. Collectors should extend AbstractCollector")
+            raise ValueError(
+                "Invalid collector. Collectors should extend AbstractCollector")
 
 
 class Server(LoggerMixIn):
@@ -41,7 +42,8 @@ class Server(LoggerMixIn):
 
     @classmethod
     def _create_queue(cls):
-        return multiprocessing.Queue() if cls._use_multiprocessing() else queue.Queue()
+        return multiprocessing.Queue() if cls._use_multiprocessing(
+        ) else queue.Queue()
 
     def set_destinations(self, destinations):
         self._queue_processor.set_destinations(destinations)
@@ -54,8 +56,7 @@ class Server(LoggerMixIn):
 
     def start(self):
         if not self._collectors:
-            raise Exception(
-                "Can not start Statsd server without a collector")
+            raise Exception("Can not start Statsd server without a collector")
         with self._running_lock:
             queue_proc = self._start_queue_processor()
             try:
@@ -79,7 +80,8 @@ class Server(LoggerMixIn):
             self._shutdown_collectors(timeout)
 
             if self._queue_processor.is_processing():
-                self._shutdown_queue_processor(max(0.1, timeout - (time() - start_time)) if timeout else None)
+                self._shutdown_queue_processor(max(0.1, timeout - (time(
+                ) - start_time)) if timeout else None)
             self._shutdown.set()
 
     def wait_until_shutdown(self, timeout=None):

@@ -23,7 +23,6 @@ class StubDestination(AbstractDestination):
         self._flushed_expected_count.wait(timeout)
 
 
-
 class StubCollector(AbstractCollector):
     def __init__(self, data=None):
         super(StubCollector, self).__init__()
@@ -58,10 +57,10 @@ class TestFunctions(unittest.TestCase):
 
 
 class TestServer(unittest.TestCase):
-
     def test_set_destination_fails_on_invalid_destination(self):
         server = Server()
-        self.assertRaises(ValueError, server.set_destinations, "not a destination")
+        self.assertRaises(ValueError, server.set_destinations,
+                          "not a destination")
 
     def test_set_destinations(self):
         server = Server()

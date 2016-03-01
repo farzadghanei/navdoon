@@ -5,6 +5,7 @@ import navdoon.utils
 def mock_cpu_count(count):
     def _cpu_count():
         return count
+
     return _cpu_count
 
 

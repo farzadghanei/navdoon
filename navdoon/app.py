@@ -153,11 +153,15 @@ class App(object):
                             help='logging level',
                             choices=log_level_names)
         parser.add_argument('--log-file', help='path to log file')
-        parser.add_argument('--log-stderr', action='store_true', help='log to stderr')
+        parser.add_argument('--log-stderr',
+                            action='store_true',
+                            help='log to stderr')
         parser.add_argument('--log-syslog',
                             action='store_true',
                             help='log to syslog')
-        parser.add_argument('--flush-stdout', action='store_true', help='flush to standard output')
+        parser.add_argument('--flush-stdout',
+                            action='store_true',
+                            help='flush to standard output')
         parser.add_argument('--flush-graphite',
                             help='flush to graphite',
                             default=None)

@@ -105,6 +105,7 @@ class TestUDPServer(SocketServerTestCaseMixIn, unittest.TestCase):
     def test_get_set_queue(self):
         def set_queue(queue_):
             self.server.queue = queue_
+
         self.assertRaises(ValueError, set_queue, "not a queue")
         queue = Queue()
         self.server.queue = queue
