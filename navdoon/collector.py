@@ -26,7 +26,7 @@ class AbstractCollector(object):
         raise NotImplementedError
 
     @abstractmethod
-    def wait_until_queuing_requests(self):
+    def wait_until_queuing_requests(self, timeout=None):
         raise NotImplementedError
 
     @abstractmethod
@@ -34,7 +34,7 @@ class AbstractCollector(object):
         raise NotImplementedError
 
     @abstractmethod
-    def wait_until_shutdown(self):
+    def wait_until_shutdown(self, timeout=None):
         raise NotImplementedError
 
     @property
@@ -160,7 +160,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         try:
             self._queuing_requests.set()
             while not stop.is_set():
-                connection, remote_address = self.socket.accept()
+                connection = self.socket.accept()[0]
                 _enqueue_from_connection(connection)
         finally:
             self._queuing_requests.clear()
@@ -168,7 +168,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
     def _post_start(self):
         pass
 
-    def _do_shutdown(self, join_queue=True):
+    def _do_shutdown(self):
         self._close_socket()
         self._shutdown.set()
 
