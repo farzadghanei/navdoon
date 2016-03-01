@@ -76,25 +76,10 @@ class Server(LoggerMixIn):
     def shutdown(self, process_queue=True, timeout=None):
         with self._shutdown_lock:
             start_time = time()
-            if self._collectors:
-                collector_timeout = timeout / len(self._collectors) if timeout else None
-                for collector in self._collectors:
-                    collector.shutdown()
-                    collector.wait_until_shutdown(collector_timeout)
-                    if timeout is not None and time() - start_time > timeout:
-                        raise Exception(
-                            "Server shutdown timed out when shutting down collectors")
+            self._shutdown_collectors(timeout)
 
             if self._queue_processor.is_processing():
-                self._queue.put_nowait(self._queue_processor.stop_process_token)
-                processor_timeout = max(0.1, timeout -
-                                        (time() - start_time)) if timeout else None
-                if not process_queue:
-                    self._queue_processor.shutdown()
-                self._queue_processor.wait_until_shutdown(processor_timeout)
-                if self._queue_processor.is_processing():
-                    raise Exception(
-                        "Server shutdown timedout when shutting down processor")
+                self._shutdown_queue_processor(max(0.1, timeout - (time() - start_time)) if timeout else None)
             self._shutdown.set()
 
     def wait_until_shutdown(self, timeout=None):
@@ -124,6 +109,15 @@ class Server(LoggerMixIn):
 
         return queue_process
 
+    def _shutdown_queue_processor(self, process=True, timeout=None):
+        self._queue.put_nowait(self._queue_processor.stop_process_token)
+        if not process:
+            self._queue_processor.shutdown()
+        self._queue_processor.wait_until_shutdown(timeout)
+        if self._queue_processor.is_processing():
+            raise Exception(
+                "Server shutdown timedout when shutting down processor")
+
     def _start_collector_threads(self):
         collector_threads = []
         for collector in self._collectors:
@@ -133,3 +127,15 @@ class Server(LoggerMixIn):
             collector.wait_until_queuing_requests()
         return collector_threads
 
+    def _shutdown_collectors(self, timeout=None):
+        if self._collectors:
+            for collector in self._collectors:
+                collector.shutdown()
+                collector.wait_until_shutdown(timeout)
+                if timeout is not None:
+                    time_elapsed = time() - start_time
+                    if time_elapsed > timeout:
+                        raise Exception(
+                            "Server shutdown timed out when shutting down collectors")
+                    else:
+                        timeout -= time_elapsed
