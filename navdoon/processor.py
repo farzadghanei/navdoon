@@ -20,10 +20,12 @@ def validate_destinations(destinations):
             raise ValueError("Invalid destination for queue processor."
                              "Destination should have a flush() method")
 
+
 def validate_queue(queue_):
     if not callable(getattr(queue_, 'get', None)):
         raise ValueError("Invalid queue for queue processor."
                          "queue should have a get() method")
+
 
 class QueueProcessor(LoggerMixIn):
     """Process Statsd requests queued by the collectors"""
@@ -35,7 +37,7 @@ class QueueProcessor(LoggerMixIn):
         super(QueueProcessor, self).__init__()
         self.log_signature = 'queue.processor '
         self.stop_process_token = self.__class__.default_stop_process_token
-        self.flush_interval = 1
+        self._flush_interval = 1
         self._queue = queue_
         self._should_stop_processing = Event()
         self._processing = Event()
@@ -56,6 +58,18 @@ class QueueProcessor(LoggerMixIn):
         if self.is_processing():
             raise Exception("Can not change queue processor's queue while processing")
         self._queue = queue_
+
+    @property
+    def flush_interval(self):
+        return self._flush_interval
+
+    @flush_interval.setter
+    def flush_interval(self, interval):
+        interval_float = float(interval)
+        if interval_float <= 0:
+            raise ValueError(
+                "Invalid flush interval. Interval should be a positive number")
+        self._flush_interval = interval
 
     def add_destination(self, destination):
         validate_destinations([destination])
@@ -108,7 +122,7 @@ class QueueProcessor(LoggerMixIn):
                         data = None
 
                     if time(
-                    ) - self._last_flush_timestamp >= self.flush_interval:
+                    ) - self._last_flush_timestamp >= self._flush_interval:
                         flush()
 
                     if data == self.stop_process_token:

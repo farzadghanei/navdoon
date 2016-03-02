@@ -1,9 +1,11 @@
 import unittest
+import logging
 from random import random
 from time import sleep
 from threading import Event, Thread
 from statsdmetrics import Counter
 from navdoon.destination import AbstractDestination
+from navdoon.processor import QueueProcessor
 from navdoon.collector import AbstractCollector
 from navdoon.server import Server, validate_collectors
 
@@ -24,17 +26,20 @@ class StubDestination(AbstractDestination):
 
 
 class StubCollector(AbstractCollector):
-    def __init__(self, data=None):
+    def __init__(self, data=None, frequency=1.0):
         super(StubCollector, self).__init__()
         self.data = data
+        self.max_items = None
+        self.frequency = float(frequency)
         self._shutdown = Event()
         self.queued_data = []
 
     def start(self):
         while not self._shutdown.is_set():
-            self.queue.put(self.data)
-            self.queued_data.append(self.data)
-            sleep(random())
+            if self.max_items is None or self.max_items > len(self.queued_data):
+                self.queue.put(self.data)
+                self.queued_data.append(self.data)
+            sleep(random() / self.frequency)
 
     def wait_until_queuing_requests(self, timeout=None):
         pass
@@ -57,45 +62,22 @@ class TestFunctions(unittest.TestCase):
 
 
 class TestServer(unittest.TestCase):
-    def test_set_destination_fails_on_invalid_destination(self):
+    def test_queue_processor(self):
         server = Server()
-        self.assertRaises(ValueError, server.set_destinations,
-                          "not a destination")
-
-    def test_set_destinations(self):
-        server = Server()
-        destinations = [StubDestination()]
-        server.set_destinations(destinations)
-        self.assertEqual(destinations, server._queue_processor._destinations)
+        server.logger = logging.getLogger('test')
+        processor = server.queue_processor
+        self.assertIsInstance(processor, QueueProcessor)
 
     def test_start_fails_without_collectors(self):
         server = Server()
-        server.set_destinations([StubDestination()])
+        server.queue_processor.set_destinations([StubDestination()])
         self.assertRaises(Exception, server.start)
-
-    def test_set_flush_interval_accepts_positive_numbers(self):
-        server = Server()
-        server.flush_interval = 103
-        self.assertEquals(103, server.flush_interval)
-        server.flush_interval = 0.58
-        self.assertEquals(0.58, server.flush_interval)
-
-    def test_set_flush_interval_fails_on_not_positive_numbers(self):
-        server = Server()
-
-        def set_interval(value):
-            server.flush_interval = value
-
-        self.assertRaises(ValueError, set_interval, 0)
-        self.assertRaises(ValueError, set_interval, -10)
-        self.assertRaises(ValueError, set_interval, "not a number")
 
     def test_start_and_shutdown(self):
         server = Server()
-        dest = StubDestination()
-        server.set_destinations([dest])
-        metric = Counter('test.event', 1)
-        collector = StubCollector(metric.to_request())
+        processor = server.queue_processor
+        processor.set_destinations([StubDestination()])
+        collector = StubCollector('-')
         server.set_collectors([collector])
         server_thread = Thread(target=server.start)
         server_thread.setDaemon(True)
@@ -106,4 +88,3 @@ class TestServer(unittest.TestCase):
         server.wait_until_shutdown(5)
         self.assertFalse(server.is_running())
         self.assertFalse(server_thread.isAlive())
-

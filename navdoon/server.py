@@ -22,6 +22,7 @@ def validate_collectors(collectors):
                 "Invalid collector. Collectors should extend AbstractCollector")
 
 
+
 class Server(LoggerMixIn):
     """Statsd server"""
 
@@ -29,27 +30,23 @@ class Server(LoggerMixIn):
         super(Server, self).__init__()
         self.log_signature = 'server'
         self._collectors = []
-        self._queue = self._create_queue()
-        self._queue_processor = QueueProcessor(self._queue)
         self._running = Event()
         self._shutdown = Event()
         self._running_lock = RLock()
         self._shutdown_lock = RLock()
+        self._queue = self._create_queue()
+        self._queue_processor = self._create_queue_processor()
 
     @property
-    def flush_interval(self):
-        return self._queue_processor.flush_interval
+    def queue_processor(self):
+        return self._queue_processor
 
-    @flush_interval.setter
-    def flush_interval(self, interval):
-        flush_interval = float(interval)
-        if flush_interval <= 0:
-            raise ValueError("Invalid flush interval. Interval should be a positive number")
-        self._queue_processor.flush_interval = flush_interval
-
-    def set_destinations(self, destinations):
-        self._queue_processor.set_destinations(destinations)
-        return self
+    @queue_processor.setter
+    def queue_processor(self, processor):
+        if not isinstance(processor, QueueProcessor):
+            raise ValueError(
+                "Invalid queue processor. Processor should extend QueueProcessor")
+        self._queue_processor = processor
 
     def set_collectors(self, collectors):
         validate_collectors(collectors)
@@ -60,6 +57,7 @@ class Server(LoggerMixIn):
         if not self._collectors:
             raise Exception("Can not start Statsd server without a collector")
         with self._running_lock:
+            self._share_queue_with_collectors_and_processor()
             queue_proc = self._start_queue_processor()
             try:
                 collector_threads = self._start_collector_threads()
@@ -98,6 +96,7 @@ class Server(LoggerMixIn):
 
     @staticmethod
     def _use_multiprocessing():
+        # FIXME: use multiprocessing if available
         #return available_cpus() > 1
         return False
 
@@ -105,6 +104,17 @@ class Server(LoggerMixIn):
     def _create_queue(cls):
         return multiprocessing.Queue() if cls._use_multiprocessing(
         ) else queue.Queue()
+
+    def _create_queue_processor(self):
+        processor = QueueProcessor(self._queue)
+        processor.logger = self.logger
+        return processor
+
+    def _share_queue_with_collectors_and_processor(self):
+        queue = self._queue
+        self._queue_processor.queue = queue
+        for collector in self._collectors:
+            collector.queue = queue
 
     def _close_queue(self):
         queue = self._queue

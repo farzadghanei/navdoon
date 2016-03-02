@@ -45,6 +45,23 @@ class StubDestination(LoggerMixIn, AbstractDestination):
 class TestQueueProcessor(unittest.TestCase):
     """Test processor.QueueProcessor class"""
 
+    def test_set_flush_interval_accepts_positive_numbers(self):
+        processor = QueueProcessor(Queue())
+        processor.flush_interval = 103
+        self.assertEquals(103, processor.flush_interval)
+        processor.flush_interval = 0.58
+        self.assertEquals(0.58, processor.flush_interval)
+
+    def test_set_flush_interval_fails_on_not_positive_numbers(self):
+        processor = QueueProcessor(Queue())
+
+        def set_interval(value):
+            processor.flush_interval = value
+
+        self.assertRaises(ValueError, set_interval, 0)
+        self.assertRaises(ValueError, set_interval, -10)
+        self.assertRaises(ValueError, set_interval, "not a number")
+
     def test_processor_does_not_accept_invalid_queue(self):
         self.assertRaises(ValueError, QueueProcessor, "not a queue")
         self.assertRaises(ValueError, QueueProcessor, 100)
@@ -82,6 +99,17 @@ class TestQueueProcessor(unittest.TestCase):
 
         processor.add_destination(destination2)
         self.assertEqual([destination, destination2], processor._destinations)
+
+    def test_set_destination_fails_on_invalid_destination(self):
+        processor = QueueProcessor(Queue())
+        self.assertRaises(ValueError, processor.set_destinations,
+                          "not a destination")
+
+    def test_set_destinations(self):
+        processor = QueueProcessor(Queue())
+        destinations = [StubDestination()]
+        processor.set_destinations(destinations)
+        self.assertEqual(destinations, processor._destinations)
 
     def test_clear_destinations(self):
         destination = StubDestination()
