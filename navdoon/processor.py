@@ -56,7 +56,8 @@ class QueueProcessor(LoggerMixIn):
     def queue(self, queue_):
         validate_queue(queue_)
         if self.is_processing():
-            raise Exception("Can not change queue processor's queue while processing")
+            raise Exception(
+                "Can not change queue processor's queue while processing")
         self._queue = queue_
 
     @property

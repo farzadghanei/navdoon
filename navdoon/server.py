@@ -22,7 +22,6 @@ def validate_collectors(collectors):
                 "Invalid collector. Collectors should extend AbstractCollector")
 
 
-
 class Server(LoggerMixIn):
     """Statsd server"""
 
@@ -79,8 +78,8 @@ class Server(LoggerMixIn):
             start_time = time()
             self._shutdown_collectors(timeout)
             if self._queue_processor.is_processing():
-                self._shutdown_queue_processor(process_queue, max(0.1, timeout - (time(
-                ) - start_time)) if timeout else None)
+                self._shutdown_queue_processor(process_queue, max(
+                    0.1, timeout - (time() - start_time)) if timeout else None)
             self._close_queue()
             self._shutdown.set()
 
@@ -125,7 +124,8 @@ class Server(LoggerMixIn):
 
     def _start_queue_processor(self):
         if self._use_multiprocessing():
-            queue_process = multiprocessing.Process(target=self._queue_processor.process)
+            queue_process = multiprocessing.Process(
+                target=self._queue_processor.process)
             queue_process.start()
         else:
             queue_process = Thread(target=self._queue_processor.process)

@@ -36,7 +36,8 @@ class StubCollector(AbstractCollector):
 
     def start(self):
         while not self._shutdown.is_set():
-            if self.max_items is None or self.max_items > len(self.queued_data):
+            if self.max_items is None or self.max_items > len(
+                    self.queued_data):
                 self.queue.put(self.data)
                 self.queued_data.append(self.data)
             sleep(random() / self.frequency)

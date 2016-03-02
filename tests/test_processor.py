@@ -67,8 +67,10 @@ class TestQueueProcessor(unittest.TestCase):
         self.assertRaises(ValueError, QueueProcessor, 100)
 
         processor = QueueProcessor(Queue())
+
         def set_queue(value):
             processor.queue = value
+
         self.assertRaises(ValueError, set_queue, "not a queue")
         self.assertRaises(ValueError, set_queue, 100)
 
