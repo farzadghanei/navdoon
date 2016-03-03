@@ -91,7 +91,8 @@ class TestServer(unittest.TestCase):
         server.queue_processor = processor
         self.assertRaises(Exception, server.start)
 
-    def test_server_creates_a_default_queue_processor_without_destination(self):
+    def test_server_creates_a_default_queue_processor_without_destination(
+            self):
         server = Server()
         collector = StubCollector('-')
         server.set_collectors([collector])
