@@ -1,6 +1,30 @@
 from typing import Optional, Union, List, AnyStr
 from socket import socket
+from abc import abstractmethod, ABCMeta
+import multiprocessing
 from navdoon.utils import LoggerMixIn
+from navdoon.pystdlib import queue
+
+
+Queue = Union[multiprocessing.Queue, queue.Queue]
+
+
+class AbstractCollector(object):
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def start(self) -> None: ...
+    @abstractmethod
+    def wait_until_queuing_requests(self, timeout: float=None) -> None: ...
+    @abstractmethod
+    def shutdown(self) -> None: ...
+    @abstractmethod
+    def wait_until_shutdown(self, timeout: float=None) -> None: ...
+    @property
+    def queue(self) -> Queue: ...
+    @queue.setter
+    def queue(self, queue_: Queue) -> 'AbstractCollector': ...
+
 
 class SocketServer(LoggerMixIn):
     def __init__(self, **kargs) -> None: ...
