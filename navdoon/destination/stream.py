@@ -13,9 +13,20 @@ class Stream(AbstractDestination):
     """Destination to flush metrics to stream"""
 
     def __init__(self, file_handle):
-        self._file = file_handle
+        self._file = None
         self.pattern = "{name} {value} {timestamp}"
         self.append = "\n"
+        self.stream = file_handle
+
+    @property
+    def stream(self):
+        return self._file
+
+    @stream.setter
+    def stream(self, file_):
+        if not callable(getattr(file_, 'write', None)):
+            raise ValueError("Destination stream should be file like object")
+        self._file = file_
 
     def create_output_from_metrics(self, metrics):
         """Creates the output to be flushed, from the metrics"""
@@ -39,6 +50,9 @@ class Stream(AbstractDestination):
         for line in lines:
             write(line + append_)
         self._file.flush()
+
+    def __eq__(self, other):
+        return self.stream == self.stream
 
 
 class Stdout(Stream):

@@ -41,3 +41,7 @@ class Graphite(TCPClient, AbstractDestination):
         self._send_with_lock(data)
         self._log("flushed {} metrics to graphite on {}:{}".format(
             num_lines, self.host, self.port))
+
+    def __eq__(self, other):
+        return self.host == other.host and self.port == other.port and \
+                self.max_retry == other.max_retry

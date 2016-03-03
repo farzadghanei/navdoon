@@ -16,8 +16,39 @@ class TestGraphite(unittest.TestCase):
         metrics = [('no.time', 34), ('is.fine', 78, time())]
         self.assertEqual(2, len(Graphite.create_request_from_metrics(metrics)))
 
+    def test_equality_based_on_attrs(self):
+        graphite1 = Graphite('example.org', 2003)
+        graphite2 = Graphite('localhost', 2004)
+        self.assertNotEqual(graphite1, graphite2)
+
+        graphite1.host = 'localhost'
+        graphite1.port = 2004
+        self.assertEqual(graphite1, graphite2)
+
 
 class TestStream(unittest.TestCase):
+    def test_stream_property(self):
+        output = StringIO()
+        dest = Stream(output)
+        self.assertEqual(dest.stream, output)
+
+        another_dest = Stream(StringIO())
+        self.assertNotEqual(another_dest.stream, output)
+        another_dest.stream = output
+        self.assertEqual(another_dest.stream, output)
+
+    def test_stream_property_fail_on_invalid_object(self):
+        self.assertRaises(ValueError, Stream, "not a file like object")
+
+    def test_equality_based_on_stream(self):
+        output1 = StringIO()
+        output2 = StringIO()
+        stream1 = Stream(output1)
+        stream2 = Stream(output2)
+        self.assertNotEqual(stream1, stream2)
+        stream2.stream = output1
+        self.assertEqual(stream1, stream2)
+
     def test_create_output_from_metrics(self):
         output = StringIO()
         dest = Stream(output)
