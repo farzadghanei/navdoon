@@ -13,16 +13,31 @@ from statsdmetrics import (Counter, Gauge, GaugeDelta, Set,
                            parse_metric_from_request)
 
 
+def validate_destinations(destinations):
+    for destination in destinations:
+        if not hasattr(destination,
+                       'flush') or not callable(destination.flush):
+            raise ValueError("Invalid destination for queue processor."
+                             "Destination should have a flush() method")
+
+
+def validate_queue(queue_):
+    if not callable(getattr(queue_, 'get', None)):
+        raise ValueError("Invalid queue for queue processor."
+                         "queue should have a get() method")
+
+
 class QueueProcessor(LoggerMixIn):
     """Process Statsd requests queued by the collectors"""
 
     default_stop_process_token = None
 
     def __init__(self, queue_):
+        validate_queue(queue_)
         super(QueueProcessor, self).__init__()
         self.log_signature = 'queue.processor '
         self.stop_process_token = self.__class__.default_stop_process_token
-        self.flush_interval = 1
+        self._flush_interval = 1
         self._queue = queue_
         self._should_stop_processing = Event()
         self._processing = Event()
@@ -33,17 +48,43 @@ class QueueProcessor(LoggerMixIn):
         self._destinations = []
         self._last_flush_timestamp = None
 
+    @property
+    def queue(self):
+        return self._queue
+
+    @queue.setter
+    def queue(self, queue_):
+        validate_queue(queue_)
+        if self.is_processing():
+            raise Exception(
+                "Can not change queue processor's queue while processing")
+        self._queue = queue_
+
+    @property
+    def flush_interval(self):
+        return self._flush_interval
+
+    @flush_interval.setter
+    def flush_interval(self, interval):
+        interval_float = float(interval)
+        if interval_float <= 0:
+            raise ValueError(
+                "Invalid flush interval. Interval should be a positive number")
+        self._flush_interval = interval
+
     def add_destination(self, destination):
-        if not hasattr(destination,
-                       'flush') or not callable(destination.flush):
-            raise ValueError("Invalid destination for queue processor."
-                             "Destination should have a flush() method")
+        validate_destinations([destination])
         if destination not in self._destinations:
             self._destinations.append(destination)
         return self
 
     def clear_destinations(self):
         self._destinations = []
+        return self
+
+    def set_destinations(self, destinations):
+        validate_destinations(destinations)
+        self._destinations = destinations
         return self
 
     def is_processing(self):
@@ -82,7 +123,7 @@ class QueueProcessor(LoggerMixIn):
                         data = None
 
                     if time(
-                    ) - self._last_flush_timestamp >= self.flush_interval:
+                    ) - self._last_flush_timestamp >= self._flush_interval:
                         flush()
 
                     if data == self.stop_process_token:
