@@ -5,6 +5,7 @@ import unittest
 from os import path
 from navdoon.app import App, parse_config_file
 from navdoon.destination import Stdout, Graphite
+from navdoon.processor import QueueProcessor
 
 test_config_file_path = path.join(
     path.join(
@@ -59,12 +60,12 @@ class TestApp(unittest.TestCase):
         app = App(['--config', self.config_filename])
         destinations = app.get_destinations()
         self.assertEqual(1, len(destinations))
-        self.assertEqual([(Stdout, ())], destinations)
+        self.assertEqual([Stdout()], destinations)
 
         app_flush_graphite = App(['--flush-graphite', 'localhost'])
         destinations = app_flush_graphite.get_destinations()
         self.assertEqual(1, len(destinations))
-        self.assertEqual([(Graphite, ('localhost', 2003))], destinations)
+        self.assertEqual([Graphite('localhost', 2003)], destinations)
 
         app_multi_flush = App(
             ['--config', self.config_filename, '--flush-graphite',
@@ -72,8 +73,17 @@ class TestApp(unittest.TestCase):
         destinations = app_multi_flush.get_destinations()
         self.assertEqual(3, len(destinations))
         expected = [
-            (Stdout, ()), (Graphite,
-                           ('example.org', 2006)), (Graphite,
-                                                    ('localhost', 2003))
+            Stdout(), Graphite('example.org', 2006),
+            Graphite ('localhost', 2003)
         ]
         self.assertEqual(expected, destinations)
+
+    def test_create_server(self):
+        app = App(['--config', self.config_filename, '--flush-interval', '17'])
+        logger = app.get_logger()
+        server = app.create_server()
+        queue_processor = server.queue_processor
+        self.assertEqual(server.logger, logger)
+        self.assertIsInstance(queue_processor, QueueProcessor)
+        self.assertEqual(queue_processor.logger, logger)
+        self.assertEqual(queue_processor.flush_interval, 17)

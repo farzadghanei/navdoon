@@ -69,7 +69,10 @@ class App(object):
                     log_level='INFO',
                     log_file=None,
                     log_stderr=False,
-                    syslog=False, )
+                    syslog=False,
+                    flush_interval=1,
+                    flush_stdout=False,
+                    flush_graphite='')
 
     def get_args(self):
         return self._args
@@ -85,21 +88,19 @@ class App(object):
     def get_destinations(self):
         destinations = []
         if self._config.get('flush_stdout'):
-            destinations.append((Stdout, ()))
+            destinations.append(Stdout())
         if self._config.get('flush_graphite'):
             for graphite_address in self._config['flush_graphite'].split(','):
                 graphite_address = graphite_address.strip().split(':')
                 graphite_host = graphite_address.pop(0).strip()
                 graphite_port = graphite_address and int(graphite_address.pop(
                 )) or 2003
-                destinations.append((Graphite, (graphite_host, graphite_port)))
+                destinations.append(Graphite(graphite_host, graphite_port))
         return destinations
 
     def create_server(self):
         server = Server()
-        server.logger = self.get_logger()
-        server.set_destinations(self.get_destinations())
-        return server
+        return self._configure_server(server)
 
     def run(self):
         with self._run_lock:
@@ -122,9 +123,22 @@ class App(object):
             destinations = self.get_destinations()
             self._close_logger()
             self._logger = logger
-            self._server.logger = logger
-            self._server.set_destinations(destinations)
+            self._configure_server(self._server)
             self._server.reload()
+
+    def _configure_server(self, server):
+        conf = self.get_config()
+        logger = self.get_logger()
+        destinations = self.get_destinations()
+        server.logger = logger
+        queue_processor = server.queue_processor
+        if queue_processor is None:
+            queue_processor = server.create_queue_processor()
+        queue_processor.logger = logger
+        queue_processor.flush_interval = conf['flush_interval']
+        queue_processor.set_destinations(destinations)
+        server.queue_processor = queue_processor
+        return server
 
     def _configure(self, args):
         parsed_args = vars(self._parse_args(args))
@@ -133,8 +147,9 @@ class App(object):
             with parsed_args['config'] as config_file:
                 configs = parse_config_file(config_file)
 
+        store_true_args = ('log_stderr', 'log_syslog', 'flush_stdout')
         for key, value in parsed_args.items():
-            if key in ('log_stderr', 'log_syslog', 'flush_stdout'):
+            if key in store_true_args:
                 if key not in configs or value is True:
                     configs[key] = value
                 continue
@@ -159,6 +174,9 @@ class App(object):
         parser.add_argument('--log-syslog',
                             action='store_true',
                             help='log to syslog')
+        parser.add_argument('--flush-interval',
+                            type=float,
+                            help='flush interval in seconds')
         parser.add_argument('--flush-stdout',
                             action='store_true',
                             help='flush to standard output')
