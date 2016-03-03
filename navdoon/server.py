@@ -34,7 +34,7 @@ class Server(LoggerMixIn):
         self._running_lock = RLock()
         self._shutdown_lock = RLock()
         self._queue = self._create_queue()
-        self._queue_processor = self._create_queue_processor()
+        self._queue_processor = None
 
     @property
     def queue_processor(self):
@@ -55,16 +55,23 @@ class Server(LoggerMixIn):
     def start(self):
         if not self._collectors:
             raise Exception("Can not start Statsd server without a collector")
+        if self._queue_processor is None:
+            self._log_warn("no queue processor provided. Creating a queue processor with no destinations")
+            self._queue_processor = self.create_queue_processor()
         with self._running_lock:
+            self._log("starting ...")
             self._share_queue_with_collectors_and_processor()
-            queue_proc = self._start_queue_processor()
+            queue_thread = self._start_queue_processor()
+            self._log_debug("started queue processor thread")
             try:
                 collector_threads = self._start_collector_threads()
                 self._running.set()
+                self._log("queue processor and collectors are running")
                 for thread in collector_threads:
                     thread.join()
             finally:
-                queue_proc.join()
+                self._log("stopped, joining queue processor thread")
+                queue_thread.join()
                 self._running.clear()
 
     def is_running(self):
@@ -75,6 +82,7 @@ class Server(LoggerMixIn):
 
     def shutdown(self, process_queue=True, timeout=None):
         with self._shutdown_lock:
+            self._log("shutting down ...")
             start_time = time()
             self._shutdown_collectors(timeout)
             if self._queue_processor.is_processing():
@@ -104,7 +112,7 @@ class Server(LoggerMixIn):
         return multiprocessing.Queue() if cls._use_multiprocessing(
         ) else queue.Queue()
 
-    def _create_queue_processor(self):
+    def create_queue_processor(self):
         processor = QueueProcessor(self._queue)
         processor.logger = self.logger
         return processor
@@ -124,16 +132,19 @@ class Server(LoggerMixIn):
 
     def _start_queue_processor(self):
         if self._use_multiprocessing():
+            self._log_debug("stating queue processor in a separate process")
             queue_process = multiprocessing.Process(
                 target=self._queue_processor.process)
             queue_process.start()
         else:
+            self._log_debug("stating queue processor in a thread")
             queue_process = Thread(target=self._queue_processor.process)
             queue_process.setDaemon(True)
             queue_process.start()
 
         self._queue_processor.wait_until_processing(30)
         if not self._queue_processor.is_processing():
+            self._log_error("queue processor didn't start correctly time is up")
             self._queue_processor.shutdown()
             queue_process.join()
             raise Exception("Failed to start the queue processor")
@@ -141,16 +152,20 @@ class Server(LoggerMixIn):
         return queue_process
 
     def _shutdown_queue_processor(self, process=True, timeout=None):
+        start_time = time()
+        self._log_debug("shutting down the queue processor ...")
         self._queue.put_nowait(self._queue_processor.stop_process_token)
         if not process:
             self._queue_processor.shutdown()
         self._queue_processor.wait_until_shutdown(timeout)
         if self._queue_processor.is_processing():
+            self._log_error("shutting down queue processor timedout after {} seconds".format(time() - start_time))
             raise Exception(
                 "Server shutdown timedout when shutting down processor")
 
     def _start_collector_threads(self):
         collector_threads = []
+        self._log_debug("stating {} collectors ...".format(len(self._collectors)))
         for collector in self._collectors:
             thread = Thread(target=collector.start)
             collector_threads.append(thread)
@@ -161,12 +176,14 @@ class Server(LoggerMixIn):
     def _shutdown_collectors(self, timeout=None):
         start_time = time()
         if self._collectors:
+            self._log_debug("shutting down {} collectors ...".format(len(self._collectors)))
             for collector in self._collectors:
                 collector.shutdown()
                 collector.wait_until_shutdown(timeout)
                 if timeout is not None:
                     time_elapsed = time() - start_time
                     if time_elapsed > timeout:
+                        self._log_error("shutting down collectors timedout after {} seconds".format(time_elapsed))
                         raise Exception(
                             "Server shutdown timed out when shutting down collectors")
                     else:

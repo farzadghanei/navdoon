@@ -63,21 +63,39 @@ class TestFunctions(unittest.TestCase):
 
 
 class TestServer(unittest.TestCase):
-    def test_queue_processor(self):
+    def test_create_queue_processor(self):
         server = Server()
         server.logger = logging.getLogger('test')
-        processor = server.queue_processor
+        processor = server.create_queue_processor()
         self.assertIsInstance(processor, QueueProcessor)
+        self.assertEqual(server.logger, processor.logger)
 
     def test_start_fails_without_collectors(self):
         server = Server()
-        server.queue_processor.set_destinations([StubDestination()])
+        processor = server.create_queue_processor()
+        processor.set_destinations([StubDestination()])
+        server.queue_processor = processor
         self.assertRaises(Exception, server.start)
 
-    def test_start_and_shutdown(self):
+    def test_server_creates_a_default_queue_processor_without_destination(self):
         server = Server()
-        processor = server.queue_processor
+        collector = StubCollector('-')
+        server.set_collectors([collector])
+        server_thread = Thread(target=server.start)
+        server_thread.setDaemon(True)
+        server_thread.start()
+        server.wait_until_running(5)
+        self.assertTrue(server.is_running())
+        server.shutdown()
+        server.wait_until_shutdown(5)
+        self.assertFalse(server.is_running())
+        self.assertFalse(server_thread.isAlive())
+
+    def test_start_and_shutdown_with_configured_queue_processor(self):
+        server = Server()
+        processor = server.create_queue_processor()
         processor.set_destinations([StubDestination()])
+        server.queue_processor = processor
         collector = StubCollector('-')
         server.set_collectors([collector])
         server_thread = Thread(target=server.start)

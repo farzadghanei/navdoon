@@ -7,7 +7,7 @@ Commont utilities and mixin classes
 import socket
 from os import getpid
 from time import sleep
-from logging import INFO, DEBUG, ERROR
+from logging import INFO, DEBUG, ERROR, WARN
 from threading import Lock
 from multiprocessing import cpu_count
 
@@ -34,6 +34,9 @@ class LoggerMixIn(object):
 
     def _log_error(self, msg):
         self._log(msg, ERROR)
+
+    def _log_warn(self, msg):
+        self._log(msg, WARN)
 
     def _log(self, msg, level=INFO):
         if self.logger:
