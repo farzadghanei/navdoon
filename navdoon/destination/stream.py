@@ -52,7 +52,7 @@ class Stream(AbstractDestination):
         self._file.flush()
 
     def __eq__(self, other):
-        return self.stream == self.stream
+        return self.stream == other.stream
 
 
 class Stdout(Stream):
