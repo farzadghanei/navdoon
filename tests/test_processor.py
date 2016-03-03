@@ -270,8 +270,8 @@ class TestStatsShelf(unittest.TestCase):
         shelf.add(Set("users", "me"))
         shelf.add(Set("say.what?", "nothing"))
         shelf.add(Set("say.what?", "ok"))
-        expected = {"users": set(("me", "you")),
-                    "say.what?": set(("nothing", "ok"))}
+        expected = {"users": {"me", "you"},
+                    "say.what?": {"nothing", "ok"}}
         self.assertEqual(expected, shelf.sets())
 
         sets = shelf.sets()

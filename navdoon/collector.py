@@ -42,13 +42,13 @@ class AbstractCollector(object):
         return self._queue
 
     @queue.setter
-    def queue(self, queue_):
+    def queue(self, value):
         for method in ('put_nowait', ):
-            if not callable(getattr(queue_, method, None)):
+            if not callable(getattr(value, method, None)):
                 raise ValueError(
                     "Invalid queue for collector. Queue is missing method '{}'".format(
                         method))
-        self._queue = queue_
+        self._queue = value
         return self
 
 

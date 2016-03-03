@@ -42,11 +42,11 @@ class Server(LoggerMixIn):
         return self._queue_processor
 
     @queue_processor.setter
-    def queue_processor(self, processor):
-        if not isinstance(processor, QueueProcessor):
+    def queue_processor(self, value):
+        if not isinstance(value, QueueProcessor):
             raise ValueError(
-                "Invalid queue processor. Processor should extend QueueProcessor")
-        self._queue_processor = processor
+                "Invalid queue value. Processor should extend QueueProcessor")
+        self._queue_processor = value
 
     def set_collectors(self, collectors):
         validate_collectors(collectors)
