@@ -103,6 +103,14 @@ class Server(LoggerMixIn):
                 raise Exception("Servert shutdown timedout")
             sleep(0.5)
 
+    def create_queue_processor(self):
+        processor = QueueProcessor(self._queue)
+        processor.logger = self.logger
+        return processor
+
+    def reload(self):
+        raise NotImplementedError()
+
     @staticmethod
     def _use_multiprocessing():
         # FIXME: use multiprocessing if available
@@ -113,11 +121,6 @@ class Server(LoggerMixIn):
     def _create_queue(cls):
         return multiprocessing.Queue() if cls._use_multiprocessing(
         ) else queue.Queue()
-
-    def create_queue_processor(self):
-        processor = QueueProcessor(self._queue)
-        processor.logger = self.logger
-        return processor
 
     def _share_queue_with_collectors_and_processor(self):
         queue = self._queue
