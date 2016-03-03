@@ -120,7 +120,6 @@ class App(object):
                 raise Exception("App is not running, can not reload")
             self._configure(self._args)
             logger = self._create_logger()
-            destinations = self.get_destinations()
             self._close_logger()
             self._logger = logger
             self._configure_server(self._server)
