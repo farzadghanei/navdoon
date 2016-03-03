@@ -16,6 +16,7 @@ from navdoon.processor import QueueProcessor
 
 
 def validate_collectors(collectors):
+    """Validate collectors to be usable by the server"""
     for collector in collectors:
         if not isinstance(collector, AbstractCollector):
             raise ValueError(
