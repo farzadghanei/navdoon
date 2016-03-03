@@ -5,8 +5,7 @@ from argparse import Namespace
 from navdoon.destination import AbstractDestination
 from navdoon.server import Server
 
-Boolean = Union[True, False]
-ConfigurationValue = Union[AnyStr, float, Boolean, None]
+ConfigurationValue = Union[AnyStr, float, bool, None]
 Configurations = Dict[AnyStr, ConfigurationValue]
 Arguments = Iterable[AnyStr]
 IO = Union[io.IO, FileIO]
