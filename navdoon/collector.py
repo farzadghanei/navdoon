@@ -13,6 +13,9 @@ from navdoon.pystdlib.queue import Queue
 from navdoon.utils import LoggerMixIn
 
 
+DEFAULT_PORT = 8125
+
+
 class AbstractCollector(object):
     """Abstract base class for collectors"""
 
@@ -55,7 +58,7 @@ class AbstractCollector(object):
 class SocketServer(LoggerMixIn, AbstractCollector):
     """Collect Statsd metrics via TCP/UDP socket"""
 
-    default_port = 8125
+    default_port = DEFAULT_PORT
 
     def __init__(self, **kargs):
         AbstractCollector.__init__(self)

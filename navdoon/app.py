@@ -18,6 +18,7 @@ import navdoon
 from navdoon.pystdlib import configparser
 from navdoon.server import Server
 from navdoon.destination import Stdout, Graphite
+from navdoon.collector import SocketServer, DEFAULT_PORT
 
 log_level_names = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')
 
@@ -72,7 +73,9 @@ class App(object):
                     syslog=False,
                     flush_interval=1,
                     flush_stdout=False,
-                    flush_graphite='')
+                    flush_graphite='',
+                    collect_udp='127.0.0.1:8125',
+                    collect_tcp='')
 
     def get_args(self):
         return self._args
@@ -97,6 +100,19 @@ class App(object):
                 )) or 2003
                 destinations.append(Graphite(graphite_host, graphite_port))
         return destinations
+
+    def create_collectors(self):
+        collectors = []
+        if self._config.get('collect_udp'):
+            udp_addresses = self._get_addresses_with_unique_ports(self._config['collect_udp'].split(','))
+            for (host, port) in udp_addresses:
+                udp_server = self._configure_socket_server_collector(
+                        SocketServer(),
+                        host=host,
+                        port=port
+                )
+                collectors.append(udp_server)
+        return collectors
 
     def create_server(self):
         server = Server()
@@ -138,7 +154,18 @@ class App(object):
         queue_processor.flush_interval = conf['flush_interval']
         queue_processor.set_destinations(destinations)
         server.queue_processor = queue_processor
+        server.set_collectors(self.create_collectors)
         return server
+
+    def _configure_socket_server_collector(self, collector, host=None, port=None):
+        logger = self.get_logger()
+        if logger.handlers:
+            collector.logger = logger
+        if host:
+            collector.host = host
+        if port:
+            collector.port = port
+        return collector
 
     def _configure(self, args):
         parsed_args = vars(self._parse_args(args))
@@ -222,6 +249,23 @@ class App(object):
                 handlers.append(handler)
             map(self._logger.removeHandler, handlers)
         self._logger = None
+
+    def _get_addresses_with_unique_ports(addresses):
+        address_tuples = [tuple(address.strip().split(':')) for address in addresses]
+        result = []
+        ports = set()
+        for (host, port_str) in address_tuples:
+            if port_str:
+                port = int(port_str)
+                if port < 1 or port > 65535:
+                    raise ValueError("Port {} is out of range".format(port_str))
+                if port in ports:
+                    raise ValueError("Port {} is already specified before".format(port_str))
+            else:
+                port = DEFAULT_PORT
+            result.append((host, port))
+            ports.add(port)
+        return result
 
 
 def main(args):
