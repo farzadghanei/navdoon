@@ -56,21 +56,21 @@ class TestApp(unittest.TestCase):
         self.assertEqual(stderr_handler.stream, sys.stderr)
         self.assertIsInstance(syslog_handler, logging.handlers.SysLogHandler)
 
-    def test_get_destinations(self):
+    def test_create_destinations(self):
         app = App(['--config', self.config_filename])
-        destinations = app.get_destinations()
+        destinations = app.create_destinations()
         self.assertEqual(1, len(destinations))
         self.assertEqual([Stdout()], destinations)
 
         app_flush_graphite = App(['--flush-graphite', 'localhost'])
-        destinations = app_flush_graphite.get_destinations()
+        destinations = app_flush_graphite.create_destinations()
         self.assertEqual(1, len(destinations))
         self.assertEqual([Graphite('localhost', 2003)], destinations)
 
         app_multi_flush = App(
             ['--config', self.config_filename, '--flush-graphite',
              'example.org:2006,localhost'])
-        destinations = app_multi_flush.get_destinations()
+        destinations = app_multi_flush.create_destinations()
         self.assertEqual(3, len(destinations))
         expected = [
             Stdout(), Graphite('example.org', 2006),

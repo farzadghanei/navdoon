@@ -85,7 +85,7 @@ class App(object):
             self._logger = self._create_logger()
         return self._logger
 
-    def get_destinations(self):
+    def create_destinations(self):
         destinations = []
         if self._config.get('flush_stdout'):
             destinations.append(Stdout())
@@ -128,7 +128,7 @@ class App(object):
     def _configure_server(self, server):
         conf = self.get_config()
         logger = self.get_logger()
-        destinations = self.get_destinations()
+        destinations = self.create_destinations()
         if logger.handlers:
             server.logger = logger
         queue_processor = server.queue_processor
