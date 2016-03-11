@@ -129,7 +129,8 @@ class App(object):
         conf = self.get_config()
         logger = self.get_logger()
         destinations = self.get_destinations()
-        server.logger = logger
+        if logger.handlers:
+            server.logger = logger
         queue_processor = server.queue_processor
         if queue_processor is None:
             queue_processor = server.create_queue_processor()
