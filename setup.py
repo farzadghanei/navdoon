@@ -36,7 +36,7 @@ with open(os.path.join(os.path.dirname(__file__), "README.rst")) as fh:
     long_description = fh.read()
 
 setup_params = dict(name=__title__,
-                    packages=["navdoon"],
+                    packages=["navdoon", "navdoon.pystdlib", "navdoon.destination"],
                     version=__version__,
                     description=__summary__,
                     long_description=long_description,
