@@ -154,7 +154,7 @@ class App(object):
         queue_processor.flush_interval = conf['flush_interval']
         queue_processor.set_destinations(destinations)
         server.queue_processor = queue_processor
-        server.set_collectors(self.create_collectors)
+        server.set_collectors(self.create_collectors())
         return server
 
     def _configure_socket_server_collector(self, collector, host=None, port=None):
