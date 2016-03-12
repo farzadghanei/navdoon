@@ -1,9 +1,11 @@
+import socket
 import sys
 import logging
 import logging.handlers
 import unittest
 from os import path
 from navdoon.app import App, parse_config_file
+from navdoon.collector import SocketServer
 from navdoon.destination import Stdout, Graphite
 from navdoon.processor import QueueProcessor
 
@@ -77,6 +79,56 @@ class TestApp(unittest.TestCase):
             Graphite ('localhost', 2003)
         ]
         self.assertEqual(expected, destinations)
+
+    def test_get_addresses_with_unique_ports(self):
+        app = App([])
+        self.assertEqual(
+            [("localhost", 8127)],
+            app.get_addresses_with_unique_ports("localhost:8127")
+        )
+        self.assertEqual(
+            [("example.org", 8125), ("localhost", 8126), ("127.0.0.1", 8127)],
+            app.get_addresses_with_unique_ports("example.org,localhost:8126,127.0.0.1:8127")
+        )
+        self.assertEqual(
+            [("", 12345), ("example.org", 8125), ("", 6789)],
+            app.get_addresses_with_unique_ports(":12345,example.org,:6789")
+        )
+        self.assertRaises(ValueError, app.get_addresses_with_unique_ports, "localhost:8125,127.0.0.1:8125")
+        self.assertRaises(ValueError, app.get_addresses_with_unique_ports, "localhost:81250000")
+        self.assertRaises(ValueError, app.get_addresses_with_unique_ports, "localhost:0")
+        self.assertRaises(ValueError, app.get_addresses_with_unique_ports, "localhost:-23")
+        self.assertRaises(ValueError, app.get_addresses_with_unique_ports, "localhost,:8125")
+
+    def test_create_collectors_creates_udp_server_by_default(self):
+        app = App([])
+        collectors = app.create_collectors()
+        self.assertEqual(len(collectors), 1)
+        collector = collectors.pop()
+        self.assertIsInstance(collector, SocketServer)
+        self.assertEqual(
+            ("127.0.0.1", 8125, socket.SOCK_DGRAM),
+            (collector.host, collector.port, collector.socket_type)
+        )
+
+    def test_create_udp_collectors(self):
+        app = App(['--collect-udp', ':8127,example.com,127.0.0.1:8126'])
+        collectors = app.create_collectors()
+        self.assertEqual(len(collectors), 3)
+        for collector in collectors:
+            self.assertIsInstance(collector, SocketServer)
+        self.assertEqual(
+            ("", 8127, socket.SOCK_DGRAM),
+            (collectors[0].host, collectors[0].port, collectors[0].socket_type)
+        )
+        self.assertEqual(
+            ("example.com", 8125, socket.SOCK_DGRAM),
+            (collectors[1].host, collectors[1].port, collectors[1].socket_type)
+        )
+        self.assertEqual(
+            ("127.0.0.1", 8126, socket.SOCK_DGRAM),
+            (collectors[2].host, collectors[2].port, collectors[2].socket_type)
+        )
 
     def test_create_server(self):
         app = App(['--config', self.config_filename, '--flush-interval', '17'])

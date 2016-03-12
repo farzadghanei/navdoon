@@ -8,6 +8,7 @@ can use as the final product.
 
 from __future__ import print_function
 
+import socket
 import sys
 import logging
 import logging.handlers
@@ -74,7 +75,7 @@ class App(object):
                     flush_interval=1,
                     flush_stdout=False,
                     flush_graphite='',
-                    collect_udp='127.0.0.1:8125',
+                    collect_udp='',
                     collect_tcp='')
 
     def get_args(self):
@@ -103,15 +104,32 @@ class App(object):
 
     def create_collectors(self):
         collectors = []
+        if self._config.get('collect_tcp'):
+            collectors.extend(
+                self._create_socket_server_collector(
+                    self._config['collect_tcp'], socket.SOCK_STREAM))
         if self._config.get('collect_udp'):
-            udp_addresses = self._get_addresses_with_unique_ports(self._config['collect_udp'].split(','))
-            for (host, port) in udp_addresses:
-                udp_server = self._configure_socket_server_collector(
-                        SocketServer(),
-                        host=host,
-                        port=port
-                )
-                collectors.append(udp_server)
+            collectors.extend(
+                self._create_socket_server_collector(
+                    self._config['collect_udp'], socket.SOCK_DGRAM))
+        if len(collectors) < 1:
+            collectors.extend(
+                self._create_socket_server_collector(
+                    '127.0.0.1:8125', socket.SOCK_DGRAM))
+        return collectors
+
+    def _create_socket_server_collector(self, addresses, socket_type):
+        collectors = []
+        socket_addresses = self.get_addresses_with_unique_ports(
+            addresses)
+        for (host, port) in socket_addresses:
+            socket_server = self._configure_socket_server_collector(
+                SocketServer(),
+                host=host,
+                port=port
+            )
+            socket_server.socket_type = socket_type
+            collectors.append(socket_server)
         return collectors
 
     def create_server(self):
@@ -124,10 +142,10 @@ class App(object):
             self._server = self.create_server()
             self._server.start()
 
-    def shutdown(self):
+    def shutdown(self, timeout=None):
         with self._shutdown_lock:
             if self._server:
-                self._server.shutdown()
+                self._server.shutdown(timeout)
             self._server = None
 
     def reload(self):
@@ -161,9 +179,9 @@ class App(object):
         logger = self.get_logger()
         if logger.handlers:
             collector.logger = logger
-        if host:
+        if host is not None:
             collector.host = host
-        if port:
+        if port is not None:
             collector.port = port
         return collector
 
@@ -210,6 +228,11 @@ class App(object):
         parser.add_argument('--flush-graphite',
                             help='flush to graphite',
                             default=None)
+        parser.add_argument('--collect-udp',
+                            help='listen on UDP addresses to collect stats')
+        parser.add_argument('--collect-tcp',
+                            help='listen on TCP addresses to collect stats')
+
         return parser.parse_args(args)
 
     def _register_signal_handlers(self):
@@ -218,10 +241,10 @@ class App(object):
         signal(SIGHUP, self._handle_signal_hup)
 
     def _handle_signal_int(self):
-        self.shutdown()
+        self.shutdown(5)
 
     def _handle_signal_term(self):
-        self.shutdown()
+        self.shutdown(5)
 
     def _handle_signal_hup(self):
         self.reload()
@@ -250,12 +273,15 @@ class App(object):
             map(self._logger.removeHandler, handlers)
         self._logger = None
 
-    def _get_addresses_with_unique_ports(addresses):
-        address_tuples = [tuple(address.strip().split(':')) for address in addresses]
+    @staticmethod
+    def get_addresses_with_unique_ports(addresses):
+        address_tuples = [tuple(address.strip().split(':')) for address in addresses.split(',')]
         result = []
         ports = set()
-        for (host, port_str) in address_tuples:
-            if port_str:
+        for address in address_tuples:
+            host = address[0]
+            if len(address) > 1 and address[1]:
+                port_str = address[1]
                 port = int(port_str)
                 if port < 1 or port > 65535:
                     raise ValueError("Port {} is out of range".format(port_str))
