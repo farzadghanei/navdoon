@@ -119,18 +119,20 @@ class QueueProcessor(LoggerMixIn):
                         break
                     try:
                         data = queue_.get(timeout=1)
+                        queue_has_data = True
                     except QueueEmptyError:
-                        data = None
+                        queue_has_data = False
 
                     if time(
                     ) - self._last_flush_timestamp >= self._flush_interval:
                         flush()
 
-                    if data == self.stop_process_token:
-                        log("got stop process token in queue")
-                        break
-                    elif data:
-                        process(data)
+                    if queue_has_data:
+                        if data == self.stop_process_token:
+                            log("got stop process token in queue")
+                            break
+                        elif data:
+                            process(data)
             finally:
                 log("stopped processing the queue")
                 self._processing.clear()
