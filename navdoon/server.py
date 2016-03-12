@@ -28,7 +28,7 @@ class Server(LoggerMixIn):
 
     def __init__(self):
         super(Server, self).__init__()
-        self.log_signature = 'server'
+        self.log_signature = 'server '
         self._collectors = []
         self._running = Event()
         self._shutdown = Event()
@@ -173,7 +173,7 @@ class Server(LoggerMixIn):
 
     def _start_collector_threads(self):
         collector_threads = []
-        self._log_debug("stating {} collectors ...".format(len(
+        self._log_debug("starting {} collectors ...".format(len(
             self._collectors)))
         for collector in self._collectors:
             thread = Thread(target=collector.start)
