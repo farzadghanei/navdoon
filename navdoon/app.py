@@ -106,19 +106,19 @@ class App(object):
         collectors = []
         if self._config.get('collect_tcp'):
             collectors.extend(
-                self._create_socket_server_collector(
+                self._create_socket_server_collectors(
                     self._config['collect_tcp'], socket.SOCK_STREAM))
         if self._config.get('collect_udp'):
             collectors.extend(
-                self._create_socket_server_collector(
+                self._create_socket_server_collectors(
                     self._config['collect_udp'], socket.SOCK_DGRAM))
         if len(collectors) < 1:
             collectors.extend(
-                self._create_socket_server_collector(
+                self._create_socket_server_collectors(
                     '127.0.0.1:8125', socket.SOCK_DGRAM))
         return collectors
 
-    def _create_socket_server_collector(self, addresses, socket_type):
+    def _create_socket_server_collectors(self, addresses, socket_type):
         collectors = []
         socket_addresses = self.get_addresses_with_unique_ports(
             addresses)
@@ -138,7 +138,6 @@ class App(object):
 
     def run(self):
         with self._run_lock:
-            self._register_signal_handlers()
             self._server = self.create_server()
             self._server.start()
 

@@ -52,7 +52,6 @@ class AbstractCollector(object):
                     "Invalid queue for collector. Queue is missing method '{}'".format(
                         method))
         self._queue = value
-        return self
 
 
 class SocketServer(LoggerMixIn, AbstractCollector):
