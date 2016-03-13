@@ -4,7 +4,7 @@ import logging
 import logging.handlers
 import unittest
 from os import path
-from navdoon.app import App, parse_config_file
+from navdoon.app import App, parse_config_file, default_syslog_socket
 from navdoon.collector import SocketServer
 from navdoon.destination import Stdout, Graphite
 from navdoon.processor import QueueProcessor
@@ -19,6 +19,16 @@ class TestParseConfigFile(unittest.TestCase):
         with open(test_config_file_path) as test_config_file:
             config = parse_config_file(test_config_file)
         self.assertEqual('WARN', config['log_level'])
+
+
+class TestDefaultSyslogSocket(unittest.TestCase):
+    def test_default_syslog_socket(self):
+        syslog_socket = default_syslog_socket()
+        self.assertIsInstance(syslog_socket, str)
+        self.assertNotEqual(syslog_socket, '')
+        if not hasattr(self, 'assertRegex'):
+            self.assertRegex = self.assertRegexpMatches
+        self.assertRegex(syslog_socket, '[/:]')
 
 
 class TestApp(unittest.TestCase):

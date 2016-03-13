@@ -20,6 +20,7 @@ from navdoon.pystdlib import configparser
 from navdoon.server import Server
 from navdoon.destination import Stdout, Graphite
 from navdoon.collector import SocketServer, DEFAULT_PORT
+from navdoon.utils import os_syslog_socket
 
 LOG_LEVEL_NAMES = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')
 
@@ -39,6 +40,11 @@ def parse_config_file(file_):
                     value, file_.name))
         config[key.replace('-', '_')] = value
     return config
+
+
+def default_syslog_socket():
+    return os_syslog_socket() or 'localhost:{}'.format(
+                                logging.handlers.SYSLOG_UDP_PORT)
 
 
 class App(object):
@@ -71,7 +77,8 @@ class App(object):
                     log_level='INFO',
                     log_file=None,
                     log_stderr=False,
-                    syslog=False,
+                    log_syslog=False,
+                    syslog_socket= default_syslog_socket(),
                     flush_interval=1,
                     flush_stdout=False,
                     flush_graphite='',
@@ -218,6 +225,11 @@ class App(object):
         parser.add_argument('--log-syslog',
                             action='store_true',
                             help='log to syslog')
+        parser.add_argument('--syslog-socket',
+                            default=default_syslog_socket(),
+                            help='syslog server socket address. '
+                            'socket path, or host:port for UDP'
+                            )
         parser.add_argument('--flush-interval',
                             type=float,
                             help='flush interval in seconds')
@@ -259,7 +271,13 @@ class App(object):
         if self._config.get('log_file'):
             logger.addHandler(logging.FileHandler(self._config['log_file']))
         if self._config.get('log_syslog'):
-            logger.addHandler(logging.handlers.SysLogHandler())
+            syslog_address = self._config['syslog_socket'].split(':')
+            if len(syslog_address) < 2:
+                syslog_address = syslog_address[0].strip()
+            else:
+                syslog_address = tuple([syslog_address[0].strip(),
+                                      int(syslog_address[1])])
+            logger.addHandler(logging.handlers.SysLogHandler(syslog_address))
         return logger
 
     def _close_logger(self):
