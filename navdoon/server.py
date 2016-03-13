@@ -11,7 +11,7 @@ from time import time, sleep
 from threading import Thread, RLock, Event
 from navdoon.pystdlib import queue
 from navdoon.collector import AbstractCollector
-from navdoon.utils import LoggerMixIn, available_cpus
+from navdoon.utils import LoggerMixIn
 from navdoon.processor import QueueProcessor
 
 
@@ -20,7 +20,7 @@ def validate_collectors(collectors):
     for collector in collectors:
         if not isinstance(collector, AbstractCollector):
             raise ValueError(
-                "Invalid collector. Collectors should extend AbstractCollector")
+                "Collectors should extend AbstractCollector")
 
 
 class Server(LoggerMixIn):
@@ -58,23 +58,34 @@ class Server(LoggerMixIn):
             raise Exception("Can not start Statsd server without a collector")
         if self._queue_processor is None:
             self._log_warn(
-                "no queue processor provided. Creating a queue processor with no destinations")
+                "no queue processor provided. Creating a queue processor "
+                "with no destinations")
             self._queue_processor = self.create_queue_processor()
         with self._running_lock:
             self._log("starting ...")
-            self._share_queue_with_collectors_and_processor()
+            self._share_queue()
             queue_thread = self._start_queue_processor()
             self._log_debug("started queue processor thread")
             try:
-                collector_threads = self._start_collector_threads()
-                self._running.set()
-                self._log("queue processor and collectors are running")
-                for thread in collector_threads:
-                    thread.join()
+                self._start_collecting()
             finally:
                 self._log("stopped, joining queue processor thread")
                 queue_thread.join()
                 self._running.clear()
+
+    def _start_collecting(self):
+        collector_threads = []
+        self._log_debug("starting {} collectors ...".format(len(
+            self._collectors)))
+        for collector in self._collectors:
+            thread = Thread(target=collector.start)
+            collector_threads.append(thread)
+            thread.start()
+            collector.wait_until_queuing_requests()
+        self._running.set()
+        self._log("collectors are running")
+        for thread in collector_threads:
+            thread.join()
 
     def is_running(self):
         return self._running.is_set()
@@ -100,7 +111,7 @@ class Server(LoggerMixIn):
             if not self._running.is_set():
                 break
             if timeout is not None and time() - start > timeout:
-                raise Exception("Servert shutdown timedout")
+                raise Exception("Server shutdown timeout")
             sleep(0.5)
 
     def create_queue_processor(self):
@@ -114,7 +125,7 @@ class Server(LoggerMixIn):
     @staticmethod
     def _use_multiprocessing():
         # FIXME: use multiprocessing if available
-        #return available_cpus() > 1
+        # return available_cpus() > 1
         return False
 
     @classmethod
@@ -122,17 +133,17 @@ class Server(LoggerMixIn):
         return multiprocessing.Queue() if cls._use_multiprocessing(
         ) else queue.Queue()
 
-    def _share_queue_with_collectors_and_processor(self):
-        queue = self._queue
-        self._queue_processor.queue = queue
+    def _share_queue(self):
+        queue_ = self._queue
+        self._queue_processor.queue = queue_
         for collector in self._collectors:
-            collector.queue = queue
+            collector.queue = queue_
 
     def _close_queue(self):
-        queue = self._queue
-        if queue:
-            if callable(getattr(queue, 'close', None)):
-                queue.close()
+        queue_ = self._queue
+        if queue_:
+            if callable(getattr(queue_, 'close', None)):
+                queue_.close()
         self._queue = None
 
     def _start_queue_processor(self):
@@ -144,7 +155,6 @@ class Server(LoggerMixIn):
         else:
             self._log_debug("stating queue processor in a thread")
             queue_process = Thread(target=self._queue_processor.process)
-            queue_process.setDaemon(True)
             queue_process.start()
 
         self._queue_processor.wait_until_processing(30)
@@ -166,21 +176,10 @@ class Server(LoggerMixIn):
         self._queue_processor.wait_until_shutdown(timeout)
         if self._queue_processor.is_processing():
             self._log_error(
-                "shutting down queue processor timedout after {} seconds".format(
+                "Queue processor shutdown timeout after {} seconds".format(
                     time() - start_time))
             raise Exception(
-                "Server shutdown timedout when shutting down processor")
-
-    def _start_collector_threads(self):
-        collector_threads = []
-        self._log_debug("starting {} collectors ...".format(len(
-            self._collectors)))
-        for collector in self._collectors:
-            thread = Thread(target=collector.start)
-            collector_threads.append(thread)
-            thread.start()
-            collector.wait_until_queuing_requests()
-        return collector_threads
+                "Server shutdown timeout when shutting down processor")
 
     def _shutdown_collectors(self, timeout=None):
         start_time = time()
@@ -194,9 +193,10 @@ class Server(LoggerMixIn):
                     time_elapsed = time() - start_time
                     if time_elapsed > timeout:
                         self._log_error(
-                            "shutting down collectors timedout after {} seconds".format(
-                                time_elapsed))
+                            "Collectors shutdown timeout after "
+                            "{} seconds".format(time_elapsed))
                         raise Exception(
-                            "Server shutdown timed out when shutting down collectors")
+                            "Server shutdown timed out when "
+                            "shutting down collectors")
                     else:
                         timeout -= time_elapsed
