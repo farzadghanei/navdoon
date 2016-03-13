@@ -132,7 +132,8 @@ class TCPClient(LoggerMixIn):
                         sock.close()
                         if max_retry and max_retry <= self._connection_tries:
                             raise IOError(
-                                "Reached maximum connection tries of '{}' to {}:{}".format(
+                                "Reached maximum connection tries of "
+                                "'{}' to {}:{}".format(
                                     max_retry, self.host, self.port))
                     sleep(self._sleep_between_retries * self._connection_tries)
         return self._sock

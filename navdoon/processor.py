@@ -102,7 +102,7 @@ class QueueProcessor(LoggerMixIn):
             self._log("processing the queue ...")
 
             queue_ = self._queue
-            QueueEmptyError = Empty
+            queue_empty_error = Empty
             process = self._process_request
             stop = self._should_stop_processing
             log_debug = self._log_debug
@@ -120,7 +120,7 @@ class QueueProcessor(LoggerMixIn):
                     try:
                         data = queue_.get(timeout=1)
                         queue_has_data = True
-                    except QueueEmptyError:
+                    except queue_empty_error:
                         queue_has_data = False
 
                     if time(
@@ -154,8 +154,8 @@ class QueueProcessor(LoggerMixIn):
                     call_destination_thread.start()
                 except Exception as exp:
                     self._log_error(
-                        "error occurred while flushing to destination: {}".format(
-                            exp))
+                        "error occurred while flushing to destination: "
+                        "{}".format(exp))
             self._last_flush_timestamp = now
 
     def shutdown(self):
@@ -221,8 +221,8 @@ class StatsShelf(object):
             metric.__class__.__name__)
         if not method_name:
             raise ValueError(
-                "Can not add metric to shelf. No method is defined to handle {}".format(
-                    metric.__class__.__name__))
+                "Can not add metric to shelf. No method is defined to "
+                "handle {}".format(metric.__class__.__name__))
         with self._lock:
             getattr(self, method_name)(metric)
 

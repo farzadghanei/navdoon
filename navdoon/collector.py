@@ -49,8 +49,8 @@ class AbstractCollector(object):
         for method in ('put_nowait', ):
             if not callable(getattr(value, method, None)):
                 raise ValueError(
-                    "Invalid queue for collector. Queue is missing method '{}'".format(
-                        method))
+                    "Invalid queue for collector. Queue is missing "
+                    "method '{}'".format(method))
         self._queue = value
 
 

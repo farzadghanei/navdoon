@@ -21,7 +21,7 @@ from navdoon.server import Server
 from navdoon.destination import Stdout, Graphite
 from navdoon.collector import SocketServer, DEFAULT_PORT
 
-log_level_names = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')
+LOG_LEVEL_NAMES = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')
 
 
 def parse_config_file(file_):
@@ -33,7 +33,7 @@ def parse_config_file(file_):
     for key, value in parser.items('navdoon'):
         if key == 'config':
             continue
-        elif key == 'log-level' and value not in log_level_names:
+        elif key == 'log-level' and value not in LOG_LEVEL_NAMES:
             raise ValueError(
                 "Invalid log level '{}' in configuration file '{}'".format(
                     value, file_.name))
@@ -57,7 +57,7 @@ class App(object):
         self._configure(args)
 
     def __del__(self):
-        self.shutdown()
+        self.shutdown(1)
         self._close_logger()
 
     @staticmethod
@@ -106,24 +106,24 @@ class App(object):
         collectors = []
         if self._config.get('collect_tcp'):
             collectors.extend(
-                self._create_socket_server_collectors(
+                self._create_socket_servers(
                     self._config['collect_tcp'], socket.SOCK_STREAM))
         if self._config.get('collect_udp'):
             collectors.extend(
-                self._create_socket_server_collectors(
+                self._create_socket_servers(
                     self._config['collect_udp'], socket.SOCK_DGRAM))
         if len(collectors) < 1:
             collectors.extend(
-                self._create_socket_server_collectors(
+                self._create_socket_servers(
                     '127.0.0.1:8125', socket.SOCK_DGRAM))
         return collectors
 
-    def _create_socket_server_collectors(self, addresses, socket_type):
+    def _create_socket_servers(self, addresses, socket_type):
         collectors = []
         socket_addresses = self.get_addresses_with_unique_ports(
             addresses)
         for (host, port) in socket_addresses:
-            socket_server = self._configure_socket_server_collector(
+            socket_server = self._configure_socket_server(
                 SocketServer(),
                 host=host,
                 port=port
@@ -174,7 +174,7 @@ class App(object):
         server.set_collectors(self.create_collectors())
         return server
 
-    def _configure_socket_server_collector(self, collector, host=None, port=None):
+    def _configure_socket_server(self, collector, host=None, port=None):
         logger = self.get_logger()
         if logger.handlers:
             collector.logger = logger
@@ -210,7 +210,7 @@ class App(object):
                             type=FileType('r'))
         parser.add_argument('--log-level',
                             help='logging level',
-                            choices=log_level_names)
+                            choices=LOG_LEVEL_NAMES)
         parser.add_argument('--log-file', help='path to log file')
         parser.add_argument('--log-stderr',
                             action='store_true',
@@ -250,7 +250,7 @@ class App(object):
 
     def _create_logger(self):
         log_level_name = self._config.get('log_level', 'INFO')
-        if log_level_name not in log_level_names:
+        if log_level_name not in LOG_LEVEL_NAMES:
             raise ValueError("invalid log level " + log_level_name)
         logger = logging.Logger('navdoon')
         logger.setLevel(getattr(logging, log_level_name))
@@ -274,7 +274,8 @@ class App(object):
 
     @staticmethod
     def get_addresses_with_unique_ports(addresses):
-        address_tuples = [tuple(address.strip().split(':')) for address in addresses.split(',')]
+        address_tuples = [tuple(address.strip().split(':')) for address in
+                          addresses.split(',')]
         result = []
         ports = set()
         for address in address_tuples:
@@ -283,9 +284,11 @@ class App(object):
                 port_str = address[1]
                 port = int(port_str)
                 if port < 1 or port > 65535:
-                    raise ValueError("Port {} is out of range".format(port_str))
+                    raise ValueError(
+                        "Port {} is out of range".format(port_str))
                 if port in ports:
-                    raise ValueError("Port {} is already specified before".format(port_str))
+                    raise ValueError(
+                        "Port {} is already specified before".format(port_str))
             else:
                 port = DEFAULT_PORT
             result.append((host, port))
