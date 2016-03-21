@@ -13,14 +13,14 @@ import sys
 import logging
 import logging.handlers
 from argparse import ArgumentParser, FileType
-from threading import RLock
+from threading import RLock, Thread
 from signal import signal, SIGINT, SIGTERM, SIGHUP
 import navdoon
 from navdoon.pystdlib import configparser
 from navdoon.server import Server
 from navdoon.destination import Stdout, Graphite
 from navdoon.collector import SocketServer, DEFAULT_PORT
-from navdoon.utils import os_syslog_socket
+from navdoon.utils import os_syslog_socket, LoggerMixIn
 
 LOG_LEVEL_NAMES = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')
 
@@ -47,16 +47,17 @@ def default_syslog_socket():
                                 logging.handlers.SYSLOG_UDP_PORT)
 
 
-class App(object):
+class App(LoggerMixIn):
     """Navdoon application, configure and use the components based on the
     provided arguments and configurations.
     """
 
     def __init__(self, args):
+        super(App, self).__init__()
+        self.log_signature = "navdoon.app "
         self._config = dict()
         self._args = args
         self._server = None
-        self._logger = None
         self._run_lock = RLock()
         self._shutdown_lock = RLock()
         self._reload_lock = RLock()
@@ -92,9 +93,9 @@ class App(object):
         return self._config
 
     def get_logger(self):
-        if not self._logger:
-            self._logger = self._create_logger()
-        return self._logger
+        if not self.logger:
+            self.logger = self._create_logger()
+        return self.logger
 
     def create_destinations(self):
         destinations = []
@@ -145,14 +146,18 @@ class App(object):
 
     def run(self):
         with self._run_lock:
+            self._register_signal_handlers()
             self._server = self.create_server()
             self._server.start()
 
     def shutdown(self, timeout=None):
         with self._shutdown_lock:
+            self._log_debug("acquired shutdown lock")
             if self._server:
+                self._log_debug("shutting down server ...")
                 self._server.shutdown(timeout)
             self._server = None
+            self._log("server shutdown successfully")
 
     def reload(self):
         with self._reload_lock:
@@ -161,7 +166,7 @@ class App(object):
             self._configure(self._args)
             logger = self._create_logger()
             self._close_logger()
-            self._logger = logger
+            self.logger = logger
             self._configure_server(self._server)
             self._server.reload()
 
@@ -249,15 +254,19 @@ class App(object):
     def _register_signal_handlers(self):
         signal(SIGINT, self._handle_signal_int)
         signal(SIGTERM, self._handle_signal_term)
-        signal(SIGHUP, self._handle_signal_hup)
+        #FIXME: uncomment this after fixing reload
+        #signal(SIGHUP, self._handle_signal_hup)
 
-    def _handle_signal_int(self):
-        self.shutdown(5)
+    def _handle_signal_int(self, *args):
+        self._log("received SIGINT")
+        self.shutdown(3)
 
-    def _handle_signal_term(self):
-        self.shutdown(5)
+    def _handle_signal_term(self, *args):
+        self._log("received SIGTERM")
+        self.shutdown(3)
 
-    def _handle_signal_hup(self):
+    def _handle_signal_hup(self, *args):
+        self._log("received SIGHUP")
         self.reload()
 
     def _create_logger(self):
@@ -281,14 +290,14 @@ class App(object):
         return logger
 
     def _close_logger(self):
-        if self._logger:
+        if self.logger:
             handlers = []
-            for handler in self._logger.handlers:
+            for handler in self.logger.handlers:
                 if hasattr(handler, 'close') and callable(handler.close):
                     handler.close()
                 handlers.append(handler)
-            map(self._logger.removeHandler, handlers)
-        self._logger = None
+            map(self.logger.removeHandler, handlers)
+        self.logger = None
 
     @staticmethod
     def get_addresses_with_unique_ports(addresses):
