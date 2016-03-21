@@ -64,6 +64,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         LoggerMixIn.__init__(self)
         self.chunk_size = 65535
         self.socket_type = socket.SOCK_DGRAM
+        self.socket_timeout = 1
         self.host = '127.0.0.1'
         self.port = self.__class__.default_port
         self.user = None
@@ -74,6 +75,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         self._shutdown = Event()
         self._should_shutdown = Event()
         self.configure(**kargs)
+        self.log_signature = "collector.socket_server "
 
     def __del__(self):
         self._do_shutdown()
@@ -114,9 +116,9 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         self._queuing_requests.wait(timeout)
 
     def shutdown(self):
-        self._log("shutting down the server ...")
-        self._should_shutdown.set()
+        self._log_debug("shutting down ...")
         self._stop_queuing_requests.set()
+        self._should_shutdown.set()
 
     def wait_until_shutdown(self, timeout=None):
         self._shutdown.wait(timeout)
@@ -129,12 +131,16 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         chunk_size = self.chunk_size
         sock = self.socket
         receive = sock.recv
+        timeout_exception = socket.timeout
         enqueue = self._queue.put_nowait
 
         try:
             self._queuing_requests.set()
             while not stop.is_set():
-                data = receive(chunk_size)
+                try:
+                    data = receive(chunk_size)
+                except timeout_exception:
+                    data = None
                 if data:
                     enqueue(data.decode())
         finally:
@@ -145,13 +151,18 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         buffer_size = self.chunk_size
         queue_put_nowait = self._queue.put_nowait
         shutdown_rdwr = socket.SHUT_RDWR
+        socket_timeout_exception = socket.timeout
 
         def _enqueue_from_connection(conn):
             receive = conn.recv
             enqueue = queue_put_nowait
+            socket_timeout = socket_timeout_exception
             try:
                 while not stop.is_set():
-                    buff = receive(buffer_size)
+                    try:
+                        buff = receive(buffer_size)
+                    except socket_timeout:
+                        continue
                     if not buff:
                         break
                     enqueue(buff.decode())
@@ -162,7 +173,10 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         try:
             self._queuing_requests.set()
             while not stop.is_set():
-                connection = self.socket.accept()[0]
+                try:
+                    connection = self.socket.accept()[0]
+                except socket_timeout_exception:
+                    continue
                 _enqueue_from_connection(connection)
         finally:
             self._queuing_requests.clear()
@@ -185,6 +199,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
     def _create_socket(self):
         sock = socket.socket(socket.AF_INET, self.socket_type)
         sock.bind((self.host, self.port))
+        sock.settimeout(self.socket_timeout)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
         if self.socket_type == socket.SOCK_STREAM:
             sock.listen(5)
