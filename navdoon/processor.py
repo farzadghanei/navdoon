@@ -9,7 +9,7 @@ from time import time
 from threading import Event, RLock, Thread
 from navdoon.pystdlib.queue import Empty
 from navdoon.utils import LoggerMixIn
-from statsdmetrics import (Counter, Gauge, GaugeDelta, Set,
+from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer,
                            parse_metric_from_request)
 
 
@@ -207,7 +207,8 @@ class StatsShelf(object):
     _metric_add_methods = {Counter.__name__: '_add_counter',
                            Set.__name__: '_add_set',
                            Gauge.__name__: '_add_gauge',
-                           GaugeDelta.__name__: '_add_gauge_delta'}
+                           GaugeDelta.__name__: '_add_gauge_delta',
+                           Timer.__name__: '_add_timer'}
 
     def __init__(self):
         self._lock = RLock()
@@ -235,6 +236,9 @@ class StatsShelf(object):
     def gauges(self):
         return self._gauges.copy()
 
+    def timers(self):
+        return self._timers.copy()
+
     def clear(self):
         self._counters = dict()
         self._timers = dict()
@@ -261,3 +265,7 @@ class StatsShelf(object):
             gauges[name] = metric.delta
         else:
             gauges[name] += metric.delta
+
+    def _add_timer(self, metric):
+        self._timers.setdefault(metric.name, list()).append(
+            metric.milliseconds)

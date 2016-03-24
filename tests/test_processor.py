@@ -2,7 +2,7 @@ import unittest
 import logging
 import sys
 from threading import Thread, Event
-from statsdmetrics import Counter, Set, Gauge, GaugeDelta
+from statsdmetrics import Counter, Set, Gauge, GaugeDelta, Timer
 from navdoon.pystdlib.queue import Queue
 from navdoon.processor import QueueProcessor, StatsShelf
 from navdoon.utils import LoggerMixIn
@@ -309,12 +309,29 @@ class TestStatsShelf(unittest.TestCase):
         expected = {"cpu%": 15, "mem%": 12}
         self.assertEqual(expected, shelf.gauges())
 
+    def test_timers(self):
+        shelf = StatsShelf()
+        self.assertEqual(dict(), shelf.timers())
+
+        shelf.add(Timer("query.user", 3.223))
+        shelf.add(Timer("query.user", 4.12))
+        shelf.add(Timer("api.auth", 9.78))
+        shelf.add(Timer("api.auth", 8.45))
+
+        expected = {"query.user": [3.223, 4.12], "api.auth": [9.78, 8.45]}
+        self.assertEqual(expected, shelf.timers())
+
     def test_clear_all_metrics(self):
         shelf = StatsShelf()
 
         shelf.add(Set("users", "me"))
         shelf.add(Counter("mymetric", 3))
+        shelf.add(Timer("query", 4.12))
+        shelf.add(Gauge("cpu%", 38))
+
         shelf.clear()
 
         self.assertEqual(dict(), shelf.counters())
         self.assertEqual(dict(), shelf.sets())
+        self.assertEqual(dict(), shelf.timers())
+        self.assertEqual(dict(), shelf.gauges())
