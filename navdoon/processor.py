@@ -8,7 +8,7 @@ queued by the collectors.
 from time import time
 from threading import Event, RLock, Thread
 from navdoon.pystdlib.queue import Empty
-from navdoon.utils import LoggerMixIn
+from navdoon.utils import LoggerMixIn, DataSeries
 from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer,
                            parse_metric_from_request)
 
@@ -236,8 +236,16 @@ class StatsShelf(object):
     def gauges(self):
         return self._gauges.copy()
 
-    def timers(self):
+    def timers_data(self):
         return self._timers.copy()
+
+    def timers(self):
+        result = dict()
+        for name, timers in self._timers.items():
+            series = DataSeries(timers)
+            result[name] = dict(count=series.count(), min=series.min(), max=series.max(),
+                                mean=series.mean(), median=series.median())
+        return result
 
     def clear(self):
         self._counters = dict()

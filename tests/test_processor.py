@@ -309,9 +309,9 @@ class TestStatsShelf(unittest.TestCase):
         expected = {"cpu%": 15, "mem%": 12}
         self.assertEqual(expected, shelf.gauges())
 
-    def test_timers(self):
+    def test_timers_data(self):
         shelf = StatsShelf()
-        self.assertEqual(dict(), shelf.timers())
+        self.assertEqual(dict(), shelf.timers_data())
 
         shelf.add(Timer("query.user", 3.223))
         shelf.add(Timer("query.user", 4.12))
@@ -319,6 +319,24 @@ class TestStatsShelf(unittest.TestCase):
         shelf.add(Timer("api.auth", 8.45))
 
         expected = {"query.user": [3.223, 4.12], "api.auth": [9.78, 8.45]}
+        self.assertEqual(expected, shelf.timers_data())
+
+    def test_timers(self):
+        shelf = StatsShelf()
+        self.assertEqual(dict(), shelf.timers())
+
+        shelf.add(Timer("query.user", 2.9))
+        shelf.add(Timer("query.user", 3))
+        shelf.add(Timer("query.user", 4.1))
+        shelf.add(Timer("api.auth", 8))
+        shelf.add(Timer("api.auth", 7.96))
+        shelf.add(Timer("cache.clear", 1.56))
+
+        expected = {
+            "query.user": dict(count=3, min=2.9, max=4.1, mean=3.3333333333333335, median=3),
+            "api.auth": dict(count=2, min=7.96, max=8, mean=7.98, median=7.98),
+            "cache.clear": dict(count=1, min=1.56, max=1.56, mean=1.56, median=1.56),
+        }
         self.assertEqual(expected, shelf.timers())
 
     def test_clear_all_metrics(self):
@@ -333,5 +351,5 @@ class TestStatsShelf(unittest.TestCase):
 
         self.assertEqual(dict(), shelf.counters())
         self.assertEqual(dict(), shelf.sets())
-        self.assertEqual(dict(), shelf.timers())
+        self.assertEqual(dict(), shelf.timers_data())
         self.assertEqual(dict(), shelf.gauges())

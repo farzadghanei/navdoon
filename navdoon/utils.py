@@ -147,3 +147,34 @@ class TCPClient(LoggerMixIn):
                                     max_retry, self.host, self.port))
                     sleep(self._sleep_between_retries * self._connection_tries)
         return self._sock
+
+
+class DataSeries(object):
+    def __init__(self, data):
+        self._count = len(data)
+        if self._count < 1:
+            raise ValueError("Can not create a series from an empty data set")
+        self._data = sorted(data)
+
+    def count(self):
+        return self._count
+
+    def min(self):
+        return min(self._data)
+
+    def max(self):
+        return max(self._data)
+
+    def mean(self):
+        return sum(self._data) / self._count
+
+    def median(self):
+        count = self._count
+        if count == 2:
+            return self.mean()
+        last_index = count - 1
+        middle_index = count // 2
+        if middle_index < last_index and count % 2 == 0:
+            return (self._data[middle_index] + self._data[middle_index + 1]) / 2
+        else:
+            return self._data[middle_index]
