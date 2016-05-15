@@ -186,6 +186,7 @@ class QueueProcessor(LoggerMixIn):
         counters = shelf.counters()
         gauges = shelf.gauges()
         sets = shelf.sets()
+        timers = shelf.timers()
         shelf.clear()
 
         metrics = []
@@ -197,6 +198,16 @@ class QueueProcessor(LoggerMixIn):
 
         for name, value in sets.items():
             metrics.append((name, len(value), timestamp))
+
+        for name, timer_stats in timers.items():
+            for statistic, value in timer_stats.items():
+                metrics.append(
+                    (
+                        "{}.{}".format(name, statistic),
+                        value,
+                        timestamp
+                    )
+                )
 
         return metrics
 

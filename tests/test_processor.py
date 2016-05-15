@@ -1,6 +1,7 @@
 import unittest
 import logging
 import sys
+from time import time
 from threading import Thread, Event
 from statsdmetrics import Counter, Set, Gauge, GaugeDelta, Timer
 from navdoon.pystdlib.queue import Queue
@@ -242,6 +243,47 @@ class TestQueueProcessor(unittest.TestCase):
 
         processor.queue = new_queue
         self.assertEqual(new_queue, processor.queue)
+
+    def test_process_timers(self):
+        start_tiemstamp = time()
+        expected_flushed_metrics_count = 2 + 5 # each timer has 5 separate metrics
+        metrics = (Counter('user.jump', 2),
+                   Set('username', 'navdoon'),
+                   Timer('db.query', 300),
+                   Set('username', 'navdoon2'),
+                   Counter('user.jump', -1),
+                   Timer('db.query', 309),
+                   Timer('db.query', 303)
+                )
+        queue_ = Queue()
+        destination = StubDestination()
+        destination.expected_count = expected_flushed_metrics_count
+        processor = QueueProcessor(queue_)
+        processor.add_destination(destination)
+        process_thread = Thread(target=processor.process)
+        process_thread.start()
+        processor.wait_until_processing(5)
+        for metric in metrics:
+            queue_.put(metric.to_request())
+        destination.wait_until_expected_count_items(5)
+        processor.shutdown()
+        processor.wait_until_shutdown(5)
+        self.assertEqual(expected_flushed_metrics_count,
+                         len(destination.metrics))
+
+        metrics_dict = dict()
+        for (name, value, timestamp) in destination.metrics:
+            metrics_dict[name] = value
+            self.assertGreaterEqual(timestamp, start_tiemstamp)
+
+        self.assertEqual(metrics_dict['user.jump'], 1)
+        self.assertEqual(metrics_dict['username'], 2)
+        self.assertEqual(metrics_dict['db.query.count'], 3)
+        self.assertEqual(metrics_dict['db.query.max'], 309)
+        self.assertEqual(metrics_dict['db.query.min'], 300)
+        self.assertEqual(metrics_dict['db.query.mean'], 304)
+        self.assertEqual(metrics_dict['db.query.median'], 303)
+
 
 
 class TestStatsShelf(unittest.TestCase):
