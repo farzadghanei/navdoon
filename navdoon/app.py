@@ -15,6 +15,8 @@ import logging.handlers
 from argparse import ArgumentParser, FileType
 from threading import RLock, Thread
 from signal import signal, SIGINT, SIGTERM, SIGHUP
+from time import sleep
+
 import navdoon
 from navdoon.pystdlib import configparser
 from navdoon.server import Server
@@ -148,7 +150,13 @@ class App(LoggerMixIn):
         with self._run_lock:
             self._register_signal_handlers()
             self._server = self.create_server()
-            self._server.start()
+            server_thread = Thread(target=self._server.start)
+            server_thread.start()
+            # If we block by joining thread, we won't receive OS signals
+            # poll the status of the server thread every often instead.
+            while server_thread.is_alive():
+                sleep(2)
+            server_thread.join()
 
     def shutdown(self, timeout=None):
         with self._shutdown_lock:
