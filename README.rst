@@ -8,6 +8,10 @@ Navdoon
 .. image:: https://codecov.io/github/farzadghanei/navdoon/coverage.svg?branch=master
     :target: https://codecov.io/github/farzadghanei/navdoon?branch=master
 
+.. image:: https://ci.appveyor.com/api/projects/status/67gbsru6tp3tjxaq/branch/master?svg=true
+    :target: https://ci.appveyor.com/api/projects/status/67gbsru6tp3tjxaq/branch/master?svg=true
+
+
 Powerful Statsd server, made easy.
 
 
