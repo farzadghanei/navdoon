@@ -250,7 +250,8 @@ class App(LoggerMixIn):
                             action='store_true',
                             help='flush to standard output')
         parser.add_argument('--flush-graphite',
-                            help='flush to graphite',
+                            help='comma separated graphite addresses to flush '
+                                    'stats to, each in host[:port] format',
                             default=None)
         parser.add_argument('--collect-udp',
                             help='listen on UDP addresses to collect stats')
