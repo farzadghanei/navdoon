@@ -6,7 +6,13 @@ navdoon
 from __future__ import print_function
 
 import os
-from setuptools import setup
+
+try:
+    import setuptools
+    from setuptools import setup
+except ImportError:
+    setuptools = None
+    from distutils.core import setup
 
 try:
     import distutilazy.test
@@ -16,6 +22,7 @@ except ImportError:
 
 from navdoon import (__title__, __summary__, __version__, __author__,
                      __license__)
+
 classifiers = [
     "Development Status :: 4 - Beta", "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
@@ -44,11 +51,13 @@ setup_params = dict(name=__title__,
                     url="https://github.com/farzadghanei/navdoon",
                     license=__license__,
                     classifiers=classifiers,
-                    install_requires=["statsdmetrics>=0.3"])
+                    install_requires=["statsdmetrics>=0.3"],
+                    scripts=['bin/navdoon'])
 
-setup_params["keywords"] = "statsd monitoring"
-setup_params["test_suite"] = "tests"
-setup_params["zip_safe"] = False
+if setuptools:
+    setup_params["keywords"] = "statsd monitoring"
+    setup_params["test_suite"] = "tests"
+    setup_params["zip_safe"] = False
 
 if distutilazy:
     setup_params["cmdclass"] = dict(test=distutilazy.test.run_tests,
