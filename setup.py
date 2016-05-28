@@ -51,8 +51,7 @@ setup_params = dict(name=__title__,
                     url="https://github.com/farzadghanei/navdoon",
                     license=__license__,
                     classifiers=classifiers,
-                    install_requires=["statsdmetrics>=0.3"],
-                    scripts=['bin/navdoon'])
+                    install_requires=["statsdmetrics>=0.3"])
 
 if setuptools:
     setup_params["keywords"] = "statsd monitoring"
@@ -61,6 +60,11 @@ if setuptools:
     setup_params["extras_require"] = dict(
         dev=["distutilazy>=0.4.1", "typing>=3.5.0.1", "coverage"]
     )
+    setup_params["entry_points"] = dict(
+        console_scripts=["navdoon=navdoon.app:main",]
+    )
+else:
+    setup_params["scripts"] = ['bin/navdoon']
 
 
 if distutilazy:

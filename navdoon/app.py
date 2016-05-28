@@ -332,11 +332,11 @@ class App(LoggerMixIn):
         return result
 
 
-def main(args):
+def main(args=sys.argv[1:]):
     """Entry point, setup and start the application"""
     app = App(args)
     return app.run()
 
 
 if __name__ == '__main__':
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())
