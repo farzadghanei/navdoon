@@ -58,6 +58,10 @@ if setuptools:
     setup_params["keywords"] = "statsd monitoring"
     setup_params["test_suite"] = "tests"
     setup_params["zip_safe"] = False
+    setup_params["extras_require"] = dict(
+        dev=["distutilazy>=0.4.1", "typing>=3.5.0.1", "coverage"]
+    )
+
 
 if distutilazy:
     setup_params["cmdclass"] = dict(test=distutilazy.test.run_tests,
