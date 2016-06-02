@@ -1,5 +1,5 @@
 from typing import AnyStr, List, Tuple
-from navdoon.utils import TCPClient
+from navdoon.utils.common import TCPClient
 from navdoon.destination.abstract import AbstractDestination
 
 Lines = List[AnyStr]

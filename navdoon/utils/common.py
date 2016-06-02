@@ -1,33 +1,14 @@
 """
-navdoon.utils
--------------
-Commont utilities and mixin classes
+navdoon.utils.common
+--------------------
+Common utilities and mixin classes
 """
 
 import socket
-import platform
 from os import getpid
 from time import sleep
 from logging import INFO, DEBUG, ERROR, WARN
 from threading import Lock
-from multiprocessing import cpu_count
-
-
-def available_cpus():
-    try:
-        cpus = cpu_count()
-    except Exception:
-        cpus = 1
-    return cpus
-
-
-def os_syslog_socket():
-    syslog_addresses = dict(
-        linux="/dev/log",
-        darwin="/var/run/syslog",
-        freebsd="/var/run/log"
-    )
-    return syslog_addresses.get(platform.system().strip().lower(), None)
 
 
 class LoggerMixIn(object):

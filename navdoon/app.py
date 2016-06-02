@@ -22,7 +22,8 @@ from navdoon.pystdlib import configparser
 from navdoon.server import Server
 from navdoon.destination import Stdout, Graphite
 from navdoon.collector import SocketServer, DEFAULT_PORT
-from navdoon.utils import os_syslog_socket, LoggerMixIn
+from navdoon.utils.common import LoggerMixIn
+from navdoon.utils.system import os_syslog_socket
 
 LOG_LEVEL_NAMES = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')
 

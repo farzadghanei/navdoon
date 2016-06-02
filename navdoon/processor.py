@@ -8,7 +8,7 @@ queued by the collectors.
 from time import time
 from threading import Event, RLock, Thread
 from navdoon.pystdlib.queue import Empty
-from navdoon.utils import LoggerMixIn, DataSeries
+from navdoon.utils.common import LoggerMixIn, DataSeries
 from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer,
                            parse_metric_from_request)
 

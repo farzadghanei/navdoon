@@ -2,7 +2,7 @@ from typing import Optional, Union, List, AnyStr
 from socket import socket
 from abc import abstractmethod, ABCMeta
 import multiprocessing
-from navdoon.utils import LoggerMixIn
+from navdoon.utils.common import LoggerMixIn
 from navdoon.pystdlib import queue
 
 

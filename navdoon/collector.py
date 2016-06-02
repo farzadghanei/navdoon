@@ -10,7 +10,7 @@ import socket
 from abc import abstractmethod, ABCMeta
 from threading import Event
 from navdoon.pystdlib.queue import Queue
-from navdoon.utils import LoggerMixIn
+from navdoon.utils.common import LoggerMixIn
 
 
 DEFAULT_PORT = 8125
