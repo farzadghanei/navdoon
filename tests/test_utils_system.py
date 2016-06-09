@@ -1,6 +1,9 @@
 import unittest
+from random import random
+from time import sleep
+from threading import Thread
 import navdoon.utils.system
-from navdoon.utils.system import TaskThreadPool
+from navdoon.utils.system import ThreadPool, ExpandableThreadPool
 
 
 def mock_cpu_count(count):
@@ -24,18 +27,20 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(1, navdoon.utils.system.available_cpus())
 
 
-class TestTaskThreadPool(unittest.TestCase):
+class TestThreadPool(unittest.TestCase):
+    threadPoolClass = ThreadPool
+
     def test_init(self):
-        pool = TaskThreadPool(4)
+        pool = self.__class__.threadPoolClass(4)
         self.assertEquals(pool.size, 4)
 
     def test_initialize(self):
-        pool = TaskThreadPool(4)
+        pool = self.__class__.threadPoolClass(4)
         pool.initialize()
         self.assertEqual(len(pool.threads), 4)
 
     def test_do_tasks(self):
-        pool = TaskThreadPool(4)
+        pool = self.__class__.threadPoolClass(4)
         pool.initialize()
         executed = []
 
@@ -50,7 +55,7 @@ class TestTaskThreadPool(unittest.TestCase):
         self.assertEqual(executed, [True] * 10)
 
     def test_check_task_results(self):
-        pool = TaskThreadPool(5)
+        pool = self.__class__.threadPoolClass(5)
         pool.initialize()
 
         def change_text(text, number):
@@ -75,7 +80,40 @@ class TestTaskThreadPool(unittest.TestCase):
         self.assertEqual(results, expected_results)
 
     def test_check_task_results_fails_on_invalid_task_id(self):
-        pool = TaskThreadPool(2)
+        pool = self.__class__.threadPoolClass(2)
         pool.initialize()
         pool.stop()
         self.assertRaises(ValueError, pool.get_result, 1003)
+
+
+class TestExpandableThreadPool(TestThreadPool):
+    threadPoolClass = ExpandableThreadPool
+
+    @unittest.skip("this is not done yet")
+    def test_do_tasks_spawns_new_threads_when_workers_are_not_enough(self):
+        pool = self.__class__.threadPoolClass(2)
+        pool.initialize()
+        executed = []
+
+        def long_running_task():
+            sleep(random())
+            return executed.append(True)
+
+        def populate_queue(count):
+            for i in range(count):
+                pool.do(long_running_task)
+
+        populate_thread = Thread(target=populate_queue, args=(10,))
+        populate_thread.start()
+
+        number_of_worker_threads = []
+        while not pool.is_done():
+            number_of_worker_threads.append(len(pool.threads))
+            sleep(0.1)
+
+        populate_thread.join()
+        pool.wait_until_done()
+        pool.stop()
+
+        self.assertEqual(len(executed), 10)
+        self.assertGreater(max(number_of_worker_threads), 2)

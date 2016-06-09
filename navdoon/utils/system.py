@@ -30,13 +30,51 @@ def os_syslog_socket():
     return syslog_addresses.get(PLATFORM_NAME, None)
 
 
-class TaskThreadPool(object):
+class WorkerThread(Thread):
+    """A thread to keep consuming tasks from a task queue and store
+    the results in a dictionary of task_ids => results
+    """
+
+    def __init__(self, queue, stop_event, results):
+        self.queue = queue
+        self.stop_event = stop_event
+        self.results = results
+        Thread.__init__(self, target=self._consume_queue)
+
+    def _consume_queue(self):
+        while not self.stop_event.is_set():
+            try:
+                self._run_task_from_queue(1)
+            except Empty:
+                pass
+
+    def _run_task_from_queue(self, timeout=None):
+        (task_id, func, args, kwargs) = self.queue.get(True, timeout)
+        result = func(*args, **kwargs)
+        self.results[task_id] = result
+        self.queue.task_done()
+
+
+class TemporaryWorkerThread(WorkerThread):
+    """A worker thread that only consumes the queue as long as the queue is not
+    empty.
+    """
+
+    def _consume_queue(self):
+        while not self.stop_event.is_set():
+            try:
+                self._run_task_from_queue(1)
+            except Empty:
+                break
+
+
+class ThreadPool(object):
     def __init__(self, size):
         self._size = int(size)
         self._threads = []
         self._queue = Queue()
+        self._queue_lock = RLock()
         self._task_counter = 0
-        self._task_counter_lock = RLock()
         self._task_results = dict()
         self._stop_event = Event()
 
@@ -53,16 +91,23 @@ class TaskThreadPool(object):
 
     def initialize(self):
         self._queue = Queue()
-        self._refill_worker_threads()
+        self._create_worker_threads()
         self._start_worker_threads()
         return self
 
     def do(self, func, *args, **kwargs):
         if self._stop_event.is_set():
             raise Exception("Task thread pool has stopped")
-        task_id = self._get_next_task_counter()
-        self._queue.put((task_id, func, args, kwargs))
+        with self._queue_lock:
+            task_id = self._task_counter
+            self._task_counter += 1
+            self._handle_task(task_id, func, args, kwargs)
         return task_id
+
+    def is_done(self):
+        with self._queue_lock:
+            is_done = self._queue.empty()
+        return is_done
 
     def wait_until_done(self):
         self._queue.join()
@@ -77,35 +122,16 @@ class TaskThreadPool(object):
     def get_result(self, task_id):
         if not task_id in self._task_results:
             raise ValueError(
-                "no such task exists with id '{}'".format(task_id))
+                "No results found for task id '{}'".format(task_id))
         return self._task_results[task_id]
 
-    def _get_next_task_counter(self):
-        self._task_counter_lock.acquire()
-        counter = self._task_counter
-        self._task_counter += 1
-        self._task_counter_lock.release()
-        return counter
+    def _handle_task(self, task_id, func, args, kwargs):
+        self._queue.put((task_id, func, args, kwargs))
 
-    def _consume_task_queue(self):
-        while not self._stop_event.is_set():
-            try:
-                self._run_task_from_queue(1)
-            except Empty:
-                pass
-
-    def _run_task_from_queue(self, timeout=None):
-        (task_id, func, args, kwargs) = self._queue.get(True, timeout)
-        result = func(*args, **kwargs)
-        self._queue.task_done()
-        self._task_results[task_id] = result
-
-    def _refill_worker_threads(self):
-        self._threads.extend(
-            self._create_worker_threads(
-                self._size - len(self._threads)
-            )
-        )
+    def _create_worker_threads(self):
+        for i in range(self._size):
+            worker = WorkerThread(self._queue, self._stop_event, self._task_results)
+            self._threads.append(worker)
 
     def _start_worker_threads(self):
         for thread in self._threads:
@@ -113,11 +139,46 @@ class TaskThreadPool(object):
         self._stop_event.clear()
         return self
 
-    def _create_worker_threads(self, size):
-        threads = []
-        for i in range(size):
-            threads.append(
-                Thread(target=self._consume_task_queue)
-            )
 
-        return threads
+class ExpandableThreadPool(ThreadPool):
+
+    def __init__(self, size, max_workers=0):
+        ThreadPool.__init__(self, size)
+        self._spawn_worker_threshold = 0.5
+        self.max_workers = max_workers
+
+    @property
+    def max_workers(self):
+        return self._max_workers
+
+    @max_workers.setter
+    def max_workers(self, limit):
+        limit = int(limit)
+        if limit < 0:
+            raise ValueError("Thread pool max workers can't be negative")
+        self._max_workers = limit
+
+    @property
+    def spawn_workers_threshold(self):
+        return self._spawn_worker_threshold
+
+    @spawn_workers_threshold.setter
+    def spawn_workers_threshold(self, threshold):
+        threshold = float(threshold)
+        if limit < 0:
+            raise ValueError("Thread pool spawn workers threshold can't be negative")
+        self._spawn_worker_threshold = threshold
+
+    def _handle_task(self, task_id, func, args, kwargs):
+        ThreadPool._handle_task(self, task_id, func, args, kwargs)
+        if self._should_spawn_temp_worker():
+            self._spawn_temp_worker()
+
+    def _should_spawn_temp_worker(self):
+        return self._queue.qsize() > (self._spawn_worker_threshold * self._size) \
+                and (self._max_workers == 0 or len(self._threads) <= self._max_workers)
+
+    def _spawn_temp_worker(self):
+        thread = TemporaryWorkerThread(self._queue, self._stop_event, self._task_results)
+        self._threads.append(thread)
+        thread.start()
