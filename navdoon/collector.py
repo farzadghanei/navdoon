@@ -11,6 +11,7 @@ from abc import abstractmethod, ABCMeta
 from threading import Event
 from navdoon.pystdlib.queue import Queue
 from navdoon.utils.common import LoggerMixIn
+from navdoon.utils.system import ExpandableThreadPool
 
 
 DEFAULT_PORT = 8125
@@ -76,6 +77,8 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         self._should_shutdown = Event()
         self.configure(**kargs)
         self.log_signature = "collector.socket_server "
+        self._num_worker_threads = 4
+        self._worker_threads_limit = 200
 
     def __del__(self):
         self._do_shutdown()
@@ -153,6 +156,10 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         shutdown_rdwr = socket.SHUT_RDWR
         socket_timeout_exception = socket.timeout
 
+        thread_pool = ExpandableThreadPool(self._num_worker_threads)
+        thread_pool.workers_limit = self._worker_threads_limit
+        thread_pool.initialize()
+
         def _enqueue_from_connection(conn):
             receive = conn.recv
             enqueue = queue_put_nowait
@@ -177,7 +184,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
                     connection = self.socket.accept()[0]
                 except socket_timeout_exception:
                     continue
-                _enqueue_from_connection(connection)
+                thread_pool.do(_enqueue_from_connection, connection)
         finally:
             self._queuing_requests.clear()
 
