@@ -1,5 +1,4 @@
 import unittest
-from random import random
 from time import sleep
 from threading import Thread
 import navdoon.utils.system
@@ -89,14 +88,15 @@ class TestThreadPool(unittest.TestCase):
 class TestExpandableThreadPool(TestThreadPool):
     threadPoolClass = ExpandableThreadPool
 
-    @unittest.skip("this is not done yet")
     def test_do_tasks_spawns_new_threads_when_workers_are_not_enough(self):
-        pool = self.__class__.threadPoolClass(2)
+        pool = self.__class__.threadPoolClass(1)
+        pool.spawn_workers_threshold = 0
+        pool.workers_limit = 4
         pool.initialize()
         executed = []
 
         def long_running_task():
-            sleep(random())
+            sleep(0.2)
             return executed.append(True)
 
         def populate_queue(count):
@@ -105,15 +105,10 @@ class TestExpandableThreadPool(TestThreadPool):
 
         populate_thread = Thread(target=populate_queue, args=(10,))
         populate_thread.start()
-
-        number_of_worker_threads = []
-        while not pool.is_done():
-            number_of_worker_threads.append(len(pool.threads))
-            sleep(0.1)
-
         populate_thread.join()
         pool.wait_until_done()
         pool.stop()
 
         self.assertEqual(len(executed), 10)
-        self.assertGreater(max(number_of_worker_threads), 2)
+        self.assertGreater(pool.max_workers_count, 1)
+        self.assertLessEqual(pool.max_workers_count, 4)

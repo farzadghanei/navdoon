@@ -142,21 +142,26 @@ class ThreadPool(object):
 
 class ExpandableThreadPool(ThreadPool):
 
-    def __init__(self, size, max_workers=0):
+    def __init__(self, size, workers_limit=0):
         ThreadPool.__init__(self, size)
         self._spawn_worker_threshold = 0.5
-        self.max_workers = max_workers
+        self._max_workers_count = 0
+        self.workers_limit = workers_limit
 
     @property
-    def max_workers(self):
-        return self._max_workers
+    def workers_limit(self):
+        return self._workers_limit
 
-    @max_workers.setter
-    def max_workers(self, limit):
+    @workers_limit.setter
+    def workers_limit(self, limit):
         limit = int(limit)
         if limit < 0:
-            raise ValueError("Thread pool max workers can't be negative")
-        self._max_workers = limit
+            raise ValueError("Thread pool workers limit can't be negative")
+        self._workers_limit = limit
+
+    @property
+    def max_workers_count(self):
+        return self._max_workers_count
 
     @property
     def spawn_workers_threshold(self):
@@ -165,20 +170,26 @@ class ExpandableThreadPool(ThreadPool):
     @spawn_workers_threshold.setter
     def spawn_workers_threshold(self, threshold):
         threshold = float(threshold)
-        if limit < 0:
+        if threshold < 0:
             raise ValueError("Thread pool spawn workers threshold can't be negative")
         self._spawn_worker_threshold = threshold
 
+    def _start_worker_threads(self):
+        ThreadPool._start_worker_threads(self)
+        self._max_workers_count = len(self._threads)
+        return self
+
     def _handle_task(self, task_id, func, args, kwargs):
         ThreadPool._handle_task(self, task_id, func, args, kwargs)
-        if self._should_spawn_temp_worker():
+        if self._can_spawn_temp_worker():
             self._spawn_temp_worker()
 
-    def _should_spawn_temp_worker(self):
+    def _can_spawn_temp_worker(self):
         return self._queue.qsize() > (self._spawn_worker_threshold * self._size) \
-                and (self._max_workers == 0 or len(self._threads) <= self._max_workers)
+                and (self._workers_limit == 0 or len(self._threads) < self._workers_limit)
 
     def _spawn_temp_worker(self):
         thread = TemporaryWorkerThread(self._queue, self._stop_event, self._task_results)
         self._threads.append(thread)
         thread.start()
+        self._max_workers_count += 1
