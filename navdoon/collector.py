@@ -77,8 +77,8 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         self._should_shutdown = Event()
         self.configure(**kargs)
         self.log_signature = "collector.socket_server "
-        self._num_worker_threads = 4
-        self._worker_threads_limit = 200
+        self.num_worker_threads = 4
+        self.worker_threads_limit = 128
 
     def __del__(self):
         self._do_shutdown()
@@ -88,7 +88,8 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         Returns a list of attribute names that were affected
         """
         configured = []
-        for key in ('host', 'port', 'user', 'group', 'socket_type'):
+        for key in ('host', 'port', 'user', 'group', 'socket_type',
+                    'num_worker_threads', 'worker_threads_limit'):
             if key in kargs:
                 setattr(self, key, kargs[key])
                 configured.append(key)
@@ -156,8 +157,8 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         shutdown_rdwr = socket.SHUT_RDWR
         socket_timeout_exception = socket.timeout
 
-        thread_pool = ExpandableThreadPool(self._num_worker_threads)
-        thread_pool.workers_limit = self._worker_threads_limit
+        thread_pool = ExpandableThreadPool(self.num_worker_threads)
+        thread_pool.workers_limit = self.worker_threads_limit
         thread_pool.initialize()
 
         def _enqueue_from_connection(conn):

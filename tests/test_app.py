@@ -149,3 +149,25 @@ class TestApp(unittest.TestCase):
         self.assertIsInstance(queue_processor, QueueProcessor)
         self.assertEqual(queue_processor.logger, logger)
         self.assertEqual(queue_processor.flush_interval, 17)
+
+    def test_create_tcp_collectors(self):
+        app = App(['--collect-tcp', ':8127,example.org,127.0.0.1:8126',
+                   '--collector-threads', '8', '--collector-threads-limit', '32'])
+        collectors = app.create_collectors()
+        self.assertEqual(len(collectors), 3)
+        for collector in collectors:
+            self.assertIsInstance(collector, SocketServer)
+            self.assertEqual(collector.num_worker_threads, 8)
+            self.assertEqual(collector.worker_threads_limit, 32)
+        self.assertEqual(
+            ("", 8127, socket.SOCK_STREAM),
+            (collectors[0].host, collectors[0].port, collectors[0].socket_type)
+        )
+        self.assertEqual(
+            ("example.org", 8125, socket.SOCK_STREAM),
+            (collectors[1].host, collectors[1].port, collectors[1].socket_type)
+        )
+        self.assertEqual(
+            ("127.0.0.1", 8126, socket.SOCK_STREAM),
+            (collectors[2].host, collectors[2].port, collectors[2].socket_type)
+        )

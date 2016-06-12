@@ -87,7 +87,9 @@ class App(LoggerMixIn):
                     flush_stdout=False,
                     flush_graphite='',
                     collect_udp='',
-                    collect_tcp='')
+                    collect_tcp='',
+                    collector_threads=4,
+                    collector_threads_limit=128)
 
     def get_args(self):
         return self._args
@@ -116,9 +118,12 @@ class App(LoggerMixIn):
     def create_collectors(self):
         collectors = []
         if self._config.get('collect_tcp'):
-            collectors.extend(
-                self._create_socket_servers(
-                    self._config['collect_tcp'], socket.SOCK_STREAM))
+            tcp_collectors = self._create_socket_servers(
+                    self._config['collect_tcp'], socket.SOCK_STREAM)
+            for collector in tcp_collectors:
+                collector.num_worker_threads = self._config['collector_threads']
+                collector.worker_threads_limit = self._config['collector_threads_limit']
+            collectors.extend(tcp_collectors)
         if self._config.get('collect_udp'):
             collectors.extend(
                 self._create_socket_servers(
@@ -258,6 +263,17 @@ class App(LoggerMixIn):
                             help='listen on UDP addresses to collect stats')
         parser.add_argument('--collect-tcp',
                             help='listen on TCP addresses to collect stats')
+        parser.add_argument('--collector-threads',
+                            help='number of threads started by each collector'
+                            ' (TCP collectors only)',
+                            type=int
+                            )
+        parser.add_argument('--collector-threads-limit',
+                            help='max number of threads running by each collector'
+                            ' (TCP collectors only)',
+                            type=int
+                            )
+
 
         return parser.parse_args(args)
 
