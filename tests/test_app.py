@@ -58,6 +58,14 @@ class TestApp(unittest.TestCase):
         conf = app.get_config()
         self.assertEqual('ERROR', conf['log_level'])
 
+    def test_validate_configs(self):
+        self.assertRaises(ValueError, App, ('--collector-threads', '0'))
+        self.assertRaises(ValueError, App, ('--collector-threads-limit', '-1'))
+        self.assertRaises(
+            ValueError, App,
+            ('--collector-threads', '2', '--collector-threads-limit', '1')
+        )
+
     def test_get_logger(self):
         app = App(('--config', self.config_filename, '--log-syslog'))
         logger = app.get_logger()

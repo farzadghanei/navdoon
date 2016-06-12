@@ -222,10 +222,10 @@ class App(LoggerMixIn):
             if key in store_true_args:
                 if key not in configs or value is True:
                     configs[key] = value
-                continue
-            if value is not None:
+            elif value is not None:
                 configs[key] = value
 
+        self._validate_configs(configs)
         self._config = configs
 
     def _parse_args(self, args):
@@ -276,6 +276,19 @@ class App(LoggerMixIn):
 
 
         return parser.parse_args(args)
+
+    def _validate_configs(self, args):
+        none_negative_args = ('collector_threads_limit',)
+        greater_than_one_args = ('collector_threads',)
+        for key, value in args.items():
+            if key in none_negative_args and value < 0:
+                raise ValueError("The value for {} can not be negative".format(key))
+            if key in greater_than_one_args and value < 1:
+                raise ValueError("The value for {} can not be less than 1".format(key))
+        if args['collector_threads_limit'] != 0 \
+            and args['collector_threads_limit'] < args['collector_threads']:
+                raise ValueError(
+                    "The value for collector_threads_limit can not be less than collector_threads")
 
     def _register_signal_handlers(self):
         signal(SIGINT, self._handle_signal_int)
