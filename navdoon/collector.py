@@ -188,6 +188,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
                 except socket_timeout_exception:
                     continue
                 thread_pool.do(_enqueue_from_connection, connection)
+            thread_pool.stop()
         finally:
             self._queuing_requests.clear()
 
