@@ -215,7 +215,7 @@ class App(LoggerMixIn):
         configs = self.get_default_config()
         if parsed_args['config'] is not None:
             with parsed_args['config'] as config_file:
-                configs = parse_config_file(config_file)
+                configs.update(parse_config_file(config_file))
 
         store_true_args = ('log_stderr', 'log_syslog', 'flush_stdout')
         for key, value in parsed_args.items():
