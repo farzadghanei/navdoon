@@ -62,8 +62,8 @@ class TestApp(unittest.TestCase):
         app = App(('--config', self.config_filename, '--log-syslog'))
         logger = app.get_logger()
         self.assertEqual(logging.WARN, logger.getEffectiveLevel())
-        self.assertEqual(2, len(logger.handlers))
-        stderr_handler, syslog_handler = logger.handlers
+        self.assertEqual(3, len(logger.handlers))
+        null_handler, stderr_handler, syslog_handler = logger.handlers
         self.assertIsInstance(stderr_handler, logging.StreamHandler)
         self.assertEqual(stderr_handler.stream, sys.stderr)
         self.assertIsInstance(syslog_handler, logging.handlers.SysLogHandler)

@@ -300,6 +300,7 @@ class App(LoggerMixIn):
         if log_level_name not in LOG_LEVEL_NAMES:
             raise ValueError("invalid log level " + log_level_name)
         logger = logging.Logger('navdoon')
+        logger.addHandler(logging.NullHandler())
         logger.setLevel(getattr(logging, log_level_name))
         if self._config.get('log_stderr'):
             logger.addHandler(logging.StreamHandler(sys.stderr))
