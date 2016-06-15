@@ -66,6 +66,32 @@ class TestApp(unittest.TestCase):
             ('--collector-threads', '2', '--collector-threads-limit', '1')
         )
 
+    def test_defaults_for_optional_args(self):
+        app = App(())
+        conf = app.get_config()
+        self.assertEqual('INFO', conf['log_level'])
+        self.assertFalse(conf['log_stderr'])
+        self.assertEqual(None, conf['log_file'])
+        self.assertFalse(conf['log_syslog'])
+        self.assertLess(0, conf['flush_interval'])
+        self.assertFalse(conf['flush_stdout'])
+        self.assertEqual('', conf['flush_graphite'])
+        self.assertEqual('', conf['collect_udp'])
+        self.assertEqual('', conf['collect_tcp'])
+
+    def test_default_options_cover_missing_configs(self):
+        app = App(('--log-level', 'FATAL', '-c', self.config_filename))
+        conf = app.get_config()
+        self.assertEqual('FATAL', conf['log_level'])
+        self.assertTrue(conf['log_stderr'])
+        self.assertEqual(None, conf['log_file'])
+        self.assertFalse(conf['log_syslog'])
+        self.assertLess(0, conf['flush_interval'])
+        self.assertTrue(conf['flush_stdout'])
+        self.assertEqual('', conf['flush_graphite'])
+        self.assertEqual('', conf['collect_udp'])
+        self.assertEqual('', conf['collect_tcp'])
+
     def test_get_logger(self):
         app = App(('--config', self.config_filename, '--log-syslog'))
         logger = app.get_logger()
