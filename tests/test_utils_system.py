@@ -31,7 +31,7 @@ class TestThreadPool(unittest.TestCase):
 
     def test_init(self):
         pool = self.__class__.threadPoolClass(4)
-        self.assertEquals(pool.size, 4)
+        self.assertEqual(pool.size, 4)
 
     def test_initialize(self):
         pool = self.__class__.threadPoolClass(4)
