@@ -6,7 +6,7 @@ from threading import Thread, Event
 from statsdmetrics import Counter, Set, Gauge, GaugeDelta, Timer
 from navdoon.pystdlib.queue import Queue
 from navdoon.processor import QueueProcessor, StatsShelf
-from navdoon.utils import LoggerMixIn
+from navdoon.utils.common import LoggerMixIn
 from navdoon.destination import AbstractDestination
 
 
