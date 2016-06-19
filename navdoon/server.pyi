@@ -3,7 +3,7 @@ import multiprocessing
 from threading import Thread
 from navdoon.pystdlib import queue
 from navdoon.collector import AbstractCollector
-from navdoon.utils import LoggerMixIn
+from navdoon.utils.common import LoggerMixIn
 from navdoon.processor import QueueProcessor
 
 

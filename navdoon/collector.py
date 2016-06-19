@@ -10,7 +10,8 @@ import socket
 from abc import abstractmethod, ABCMeta
 from threading import Event
 from navdoon.pystdlib.queue import Queue
-from navdoon.utils import LoggerMixIn
+from navdoon.utils.common import LoggerMixIn
+from navdoon.utils.system import ExpandableThreadPool
 
 
 DEFAULT_PORT = 8125
@@ -76,6 +77,8 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         self._should_shutdown = Event()
         self.configure(**kargs)
         self.log_signature = "collector.socket_server "
+        self.num_worker_threads = 4
+        self.worker_threads_limit = 128
 
     def __del__(self):
         self._do_shutdown()
@@ -85,7 +88,8 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         Returns a list of attribute names that were affected
         """
         configured = []
-        for key in ('host', 'port', 'user', 'group', 'socket_type'):
+        for key in ('host', 'port', 'user', 'group', 'socket_type',
+                    'num_worker_threads', 'worker_threads_limit'):
             if key in kargs:
                 setattr(self, key, kargs[key])
                 configured.append(key)
@@ -147,21 +151,27 @@ class SocketServer(LoggerMixIn, AbstractCollector):
             self._queuing_requests.clear()
 
     def _queue_requests_tcp(self):
-        stop = self._stop_queuing_requests
-        buffer_size = self.chunk_size
+        stop_event = self._stop_queuing_requests
+        chunk_size = self.chunk_size
         queue_put_nowait = self._queue.put_nowait
         shutdown_rdwr = socket.SHUT_RDWR
         socket_timeout_exception = socket.timeout
 
+        thread_pool = ExpandableThreadPool(self.num_worker_threads)
+        thread_pool.workers_limit = self.worker_threads_limit
+        thread_pool.initialize()
+
         def _enqueue_from_connection(conn):
-            receive = conn.recv
+            buffer_size = chunk_size
             enqueue = queue_put_nowait
-            socket_timeout = socket_timeout_exception
+            timeout_exception = socket_timeout_exception
+            stop_queue_event = stop_event
+            receive = conn.recv
             try:
-                while not stop.is_set():
+                while not stop_queue_event.is_set():
                     try:
                         buff = receive(buffer_size)
-                    except socket_timeout:
+                    except timeout_exception:
                         continue
                     if not buff:
                         break
@@ -172,12 +182,13 @@ class SocketServer(LoggerMixIn, AbstractCollector):
 
         try:
             self._queuing_requests.set()
-            while not stop.is_set():
+            while not stop_event.is_set():
                 try:
                     connection = self.socket.accept()[0]
                 except socket_timeout_exception:
                     continue
-                _enqueue_from_connection(connection)
+                thread_pool.do(_enqueue_from_connection, connection)
+            thread_pool.stop()
         finally:
             self._queuing_requests.clear()
 

@@ -22,7 +22,8 @@ from navdoon.pystdlib import configparser
 from navdoon.server import Server
 from navdoon.destination import Stdout, Graphite
 from navdoon.collector import SocketServer, DEFAULT_PORT
-from navdoon.utils import os_syslog_socket, LoggerMixIn
+from navdoon.utils.common import LoggerMixIn
+from navdoon.utils.system import os_syslog_socket
 
 LOG_LEVEL_NAMES = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')
 
@@ -86,7 +87,9 @@ class App(LoggerMixIn):
                     flush_stdout=False,
                     flush_graphite='',
                     collect_udp='',
-                    collect_tcp='')
+                    collect_tcp='',
+                    collector_threads=4,
+                    collector_threads_limit=128)
 
     def get_args(self):
         return self._args
@@ -115,9 +118,12 @@ class App(LoggerMixIn):
     def create_collectors(self):
         collectors = []
         if self._config.get('collect_tcp'):
-            collectors.extend(
-                self._create_socket_servers(
-                    self._config['collect_tcp'], socket.SOCK_STREAM))
+            tcp_collectors = self._create_socket_servers(
+                    self._config['collect_tcp'], socket.SOCK_STREAM)
+            for collector in tcp_collectors:
+                collector.num_worker_threads = self._config['collector_threads']
+                collector.worker_threads_limit = self._config['collector_threads_limit']
+            collectors.extend(tcp_collectors)
         if self._config.get('collect_udp'):
             collectors.extend(
                 self._create_socket_servers(
@@ -216,10 +222,10 @@ class App(LoggerMixIn):
             if key in store_true_args:
                 if key not in configs or value is True:
                     configs[key] = value
-                continue
-            if value is not None:
+            elif value is not None:
                 configs[key] = value
 
+        self._validate_configs(configs)
         self._config = configs
 
     def _parse_args(self, args):
@@ -257,8 +263,32 @@ class App(LoggerMixIn):
                             help='listen on UDP addresses to collect stats')
         parser.add_argument('--collect-tcp',
                             help='listen on TCP addresses to collect stats')
+        parser.add_argument('--collector-threads',
+                            help='number of threads started by each collector'
+                            ' (TCP collectors only)',
+                            type=int
+                            )
+        parser.add_argument('--collector-threads-limit',
+                            help='max number of threads running by each collector'
+                            ' (TCP collectors only)',
+                            type=int
+                            )
+
 
         return parser.parse_args(args)
+
+    def _validate_configs(self, args):
+        none_negative_args = ('collector_threads_limit',)
+        greater_than_one_args = ('collector_threads',)
+        for key, value in args.items():
+            if key in none_negative_args and value < 0:
+                raise ValueError("The value for {} can not be negative".format(key))
+            if key in greater_than_one_args and value < 1:
+                raise ValueError("The value for {} can not be less than 1".format(key))
+        if args['collector_threads_limit'] != 0 \
+            and args['collector_threads_limit'] < args['collector_threads']:
+                raise ValueError(
+                    "The value for collector_threads_limit can not be less than collector_threads")
 
     def _register_signal_handlers(self):
         signal(SIGINT, self._handle_signal_int)

@@ -5,7 +5,7 @@ A destination to flush metrics to Graphite
 """
 
 from time import time
-from navdoon.utils import TCPClient
+from navdoon.utils.common import TCPClient
 from navdoon.destination.abstract import AbstractDestination
 
 

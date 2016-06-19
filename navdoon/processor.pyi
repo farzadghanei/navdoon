@@ -2,7 +2,7 @@ from typing import AnyStr, Union, Dict, List, Tuple, Set as SetType
 import multiprocessing
 from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer)
 from navdoon.pystdlib import queue
-from navdoon.utils import LoggerMixIn
+from navdoon.utils.common import LoggerMixIn
 from navdoon.destination import AbstractDestination
 
 
