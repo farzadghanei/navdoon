@@ -32,8 +32,7 @@ Details
 
 * Navdoon uses collectors to receive Statsd metrics and recieves metrics over
   UDP (`--collect-udp`) and TCP (`--collect-tcp`),
-  and accepts multiple collectors. (TCP collector is sequencial now
-  and its performance will be much better in future versions).
+  and accepts multiple collectors.
 
 * The server saves/sends (flushes) the accumulated metrics every often
   (`--flus-interval`) to a persistent storage.
