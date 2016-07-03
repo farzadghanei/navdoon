@@ -7,7 +7,7 @@ queued by the collectors.
 
 from time import time
 from threading import Event, RLock, Thread
-from navdoon.pystdlib.queue import Empty
+from navdoon.pystdlib.queue import Empty, Queue
 from navdoon.utils.common import LoggerMixIn, DataSeries
 from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer,
                            parse_metric_from_request)
@@ -46,6 +46,9 @@ class QueueProcessor(LoggerMixIn):
         self._flush_lock = RLock()
         self._shelf = StatsShelf()
         self._destinations = []
+        self._destination_threads = []
+        self._destination_queues = []
+        self._destination_threads_initialized = Event()
         self._last_flush_timestamp = None
 
     @property
@@ -81,6 +84,24 @@ class QueueProcessor(LoggerMixIn):
         self._destinations = destinations
         return self
 
+    def init_destinations(self):
+        if self._destination_threads_initialized.is_set():
+            return False
+        self._log_debug("initializing destination threads ...")
+        for destination in self._destinations:
+            destination_queue = Queue()
+            destination_thread = Thread(
+                target=self._flush_metrics_queue_to_destination,
+                args=(destination_queue, destination))
+            destination_thread.setDaemon(True)
+            destination_thread.start()
+            self._destination_queues.append(destination_queue)
+            self._destination_threads.append(destination_thread)
+        self._destination_threads_initialized.set()
+        self._log_debug("initialized {} destination threads".format(
+            len(self._destinations)))
+        return True
+
     def is_processing(self):
         return self._processing.is_set()
 
@@ -95,10 +116,10 @@ class QueueProcessor(LoggerMixIn):
                 self._last_flush_timestamp = time()
             self._log("processing the queue ...")
 
-            queue_ = self._queue
-            queue_empty_error = Empty
+            queue_get = self._queue.get
+            QueueEmptyError = Empty
             process = self._process_request
-            stop = self._should_stop_processing
+            should_stop = self._should_stop_processing.is_set
             log_debug = self._log_debug
             log = self._log
             flush = self.flush
@@ -108,13 +129,13 @@ class QueueProcessor(LoggerMixIn):
 
             try:
                 while True:
-                    if stop.is_set():
+                    if should_stop():
                         log_debug("instructed to shutdown")
                         break
                     try:
-                        data = queue_.get(timeout=1)
+                        data = queue_get(timeout=1)
                         queue_has_data = True
-                    except queue_empty_error:
+                    except QueueEmptyError:
                         queue_has_data = False
 
                     if time(
@@ -136,20 +157,13 @@ class QueueProcessor(LoggerMixIn):
         self._log_debug("waiting for flushing lock ...")
         with self._flush_lock:
             self._log_debug("flushing lock acquired")
+            self.init_destinations()
             now = time()
             metrics = self._get_metrics_and_clear_shelf(now)
             self._log("flushing '{}' metrics to '{}' destinations".format(
                 len(metrics), len(self._destinations)))
-            for destination in self._destinations:
-                try:
-                    call_destination_thread = Thread(target=destination.flush,
-                                                     args=[metrics])
-                    call_destination_thread.daemon = True
-                    call_destination_thread.start()
-                except Exception as exp:
-                    self._log_error(
-                        "error occurred while flushing to destination: "
-                        "{}".format(exp))
+            for destination_queue in self._destination_queues:
+                destination_queue.put(metrics)
             self._last_flush_timestamp = now
 
     def shutdown(self):
@@ -158,6 +172,20 @@ class QueueProcessor(LoggerMixIn):
 
     def wait_until_shutdown(self, timeout=None):
         return self._shutdown.wait(timeout)
+
+    def _flush_metrics_queue_to_destination(self, queue_, destination):
+        should_stop = self._should_stop_processing.is_set
+        queue_get = queue_.get
+        flush = destination.flush
+        QueueEmptyError = Empty
+        while not should_stop():
+            try:
+                data = queue_get(timeout=1)
+                if data == self.stop_process_token:
+                    break
+                flush(data)
+            except QueueEmptyError:
+                pass
 
     def _process_request(self, request):
         self._log_debug("processing metrics: {}".format(str(request)))
