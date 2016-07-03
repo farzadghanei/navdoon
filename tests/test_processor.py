@@ -84,25 +84,6 @@ class TestQueueProcessor(unittest.TestCase):
         processor.queue = next_queue
         self.assertEqual(next_queue, processor.queue)
 
-    def test_add_destination_fails_when_flush_method_is_missing(self):
-        invalid_destinations = ["not callable", DestinationWithoutFlushMethod]
-        processor = QueueProcessor(Queue())
-        for dest in invalid_destinations:
-            self.assertRaises(ValueError, processor.add_destination, dest)
-
-    def test_add_destinations(self):
-        destination = StubDestination()
-        destination2 = StubDestination()
-        queue_ = Queue()
-        processor = QueueProcessor(queue_)
-
-        processor.add_destination(destination)
-        processor.add_destination(destination)
-        self.assertEqual([destination], processor._destinations)
-
-        processor.add_destination(destination2)
-        self.assertEqual([destination, destination2], processor._destinations)
-
     def test_set_destination_fails_on_invalid_destination(self):
         processor = QueueProcessor(Queue())
         self.assertRaises(ValueError, processor.set_destinations,
@@ -118,7 +99,7 @@ class TestQueueProcessor(unittest.TestCase):
         destination = StubDestination()
         queue_ = Queue()
         processor = QueueProcessor(queue_)
-        processor.add_destination(destination)
+        processor.set_destinations([destination])
         self.assertEqual([destination], processor._destinations)
         processor.clear_destinations()
         self.assertEqual([], processor._destinations)
@@ -135,7 +116,7 @@ class TestQueueProcessor(unittest.TestCase):
         destination = StubDestination()
         destination.expected_count = expected_flushed_metrics_count
         processor = QueueProcessor(queue_)
-        processor.add_destination(destination)
+        processor.set_destinations([destination])
         process_thread = Thread(target=processor.process)
         process_thread.start()
         processor.wait_until_processing(5)
@@ -164,7 +145,7 @@ class TestQueueProcessor(unittest.TestCase):
         processor = QueueProcessor(queue_)
         processor.flush_interval = 2
         processor.stop_process_token = token
-        processor.add_destination(destination)
+        processor.set_destinations([destination])
         process_thread = Thread(target=processor.process)
         process_thread.start()
         processor.wait_until_processing(5)
@@ -191,7 +172,7 @@ class TestQueueProcessor(unittest.TestCase):
 
         processor = QueueProcessor(queue_)
         processor.flush_interval = 1
-        processor.add_destination(destination)
+        processor.set_destinations([destination])
         process_thread = Thread(target=processor.process)
         process_thread.start()
         processor.wait_until_processing(5)
@@ -212,7 +193,7 @@ class TestQueueProcessor(unittest.TestCase):
         expected_flushed_metrics = len(metrics)
         destination2 = StubDestination()
         destination2.expected_count = expected_flushed_metrics
-        processor.add_destination(destination2)
+        processor.set_destinations([destination, destination2])
 
         resume_process_thread = Thread(target=processor.process)
         resume_process_thread.start()
@@ -259,7 +240,7 @@ class TestQueueProcessor(unittest.TestCase):
         destination = StubDestination()
         destination.expected_count = expected_flushed_metrics_count
         processor = QueueProcessor(queue_)
-        processor.add_destination(destination)
+        processor.set_destinations([destination])
         process_thread = Thread(target=processor.process)
         process_thread.start()
         processor.wait_until_processing(5)

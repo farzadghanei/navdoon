@@ -72,12 +72,6 @@ class QueueProcessor(LoggerMixIn):
                 "Invalid flush interval. Interval should be a positive number")
         self._flush_interval = interval
 
-    def add_destination(self, destination):
-        validate_destinations([destination])
-        if destination not in self._destinations:
-            self._destinations.append(destination)
-        return self
-
     def clear_destinations(self):
         self._destinations = []
         return self
