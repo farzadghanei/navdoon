@@ -1,7 +1,7 @@
 import unittest
 import logging
 import sys
-from time import time
+from time import time, sleep
 from threading import Thread, Event
 from statsdmetrics import Counter, Set, Gauge, GaugeDelta, Timer
 from navdoon.pystdlib.queue import Queue
@@ -167,12 +167,14 @@ class TestQueueProcessor(unittest.TestCase):
         process_thread.start()
         processor.wait_until_processing(5)
         for metric in metrics:
-            request = token if metric is token else metric.to_request()
+            if metric is token:
+                sleep(processor.flush_interval) # make sure one flush happened before token
+                request = metric
+            else:
+                request = metric.to_request()
             queue_.put(request)
         # make sure the processor has process the queue
         processor.wait_until_shutdown(5)
-        # make sure at least a flush has occurred so we can test the destination
-        processor.flush()
         self.assertFalse(processor.is_processing())
         destination.wait_until_expected_count_items(10)
         self.assertEqual(expected_flushed_metrics_count,
