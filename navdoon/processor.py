@@ -81,6 +81,10 @@ class QueueProcessor(LoggerMixIn):
 
     def set_destinations(self, destinations):
         validate_destinations(destinations)
+        if self._processing.is_set():
+            raise Exception(
+                    "Can not change destinations for the queue processor." \
+                    " It's in processing state")
         self._destinations = destinations
         return self
 

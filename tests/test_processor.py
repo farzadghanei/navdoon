@@ -95,6 +95,23 @@ class TestQueueProcessor(unittest.TestCase):
         processor.set_destinations(destinations)
         self.assertEqual(destinations, processor._destinations)
 
+    def test_set_destinations_fails_if_called_after_process(self):
+        processor = QueueProcessor(Queue())
+        destinations = [StubDestination()]
+        processor.set_destinations(destinations)
+        processor_thread = Thread(target=processor.process)
+        processor_thread.start()
+        processor.wait_until_processing(10)
+        new_destinations = [StubDestination()]
+        try:
+            self.assertRaises(Exception, processor.set_destinations, new_destinations)
+        finally:
+            processor.shutdown()
+            processor.wait_until_shutdown(10)
+        self.assertEqual(destinations, processor._destinations)
+        processor.set_destinations(new_destinations)
+        self.assertEqual(new_destinations, processor._destinations)
+
     def test_clear_destinations(self):
         destination = StubDestination()
         queue_ = Queue()
