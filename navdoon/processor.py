@@ -180,10 +180,7 @@ class QueueProcessor(LoggerMixIn):
         QueueEmptyError = Empty
         while not should_stop():
             try:
-                data = queue_get(timeout=1)
-                if data == self.stop_process_token:
-                    break
-                flush(data)
+                flush(queue_get(timeout=1))
             except QueueEmptyError:
                 pass
 
