@@ -165,11 +165,11 @@ class App(LoggerMixIn):
             server_thread.join()
 
     def shutdown(self, timeout=None):
+        if not self._server:
+            return
         with self._shutdown_lock:
-            self._log_debug("acquired shutdown lock")
-            if self._server:
-                self._log_debug("shutting down server ...")
-                self._server.shutdown(timeout)
+            self._log_debug("shutting down server ...")
+            self._server.shutdown(timeout)
             self._server = None
             self._log("server shutdown successfully")
 
