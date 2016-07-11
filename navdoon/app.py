@@ -27,12 +27,13 @@ from navdoon.utils.system import os_syslog_socket
 
 LOG_LEVEL_NAMES = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')
 
-
 def parse_config_file(file_):
     """Parse app configurations from contents of a file"""
 
-    parser = configparser.SafeConfigParser()
-    parser.readfp(file_)
+    parser = configparser.ConfigParser()
+    _parse_method = getattr(parser, 'read_file', parser.readfp)
+    _parse_method(file_)
+
     config = dict()
     for key, value in parser.items('navdoon'):
         if key == 'config':
@@ -233,7 +234,7 @@ class App(LoggerMixIn):
         parser.add_argument('-c',
                             '--config',
                             help='path to config file',
-                            type=FileType('r'))
+                            type=FileType('rt'))
         parser.add_argument('--log-level',
                             help='logging level',
                             choices=LOG_LEVEL_NAMES)
