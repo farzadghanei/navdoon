@@ -131,16 +131,15 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         pass
 
     def _queue_requests_udp(self):
-        stop = self._stop_queuing_requests
+        should_stop = self._stop_queuing_requests.is_set
         chunk_size = self.chunk_size
-        sock = self.socket
-        receive = sock.recv
+        receive = self.socket.recv
         timeout_exception = socket.timeout
         enqueue = self._queue.put_nowait
 
         try:
             self._queuing_requests.set()
-            while not stop.is_set():
+            while not should_stop():
                 try:
                     data = receive(chunk_size)
                 except timeout_exception:
@@ -221,9 +220,10 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         if sock:
             try:
                 sock.shutdown(socket.SHUT_RDWR)
-                sock.close()
-            except socket.error:
+            except socket.error as e:
                 pass
+            finally:
+                sock.close()
         self.socket = None
 
     def _change_process_user_group(self):

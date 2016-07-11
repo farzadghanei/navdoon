@@ -32,7 +32,7 @@ def consume_queue(queue_, count, timeout=1):
     return tuple(consumed)
 
 
-def send_through_socket(sock, data_set):
+def socket_sendall_close(sock, data_set):
     for data in data_set:
         sock.sendall(data)
     sock.shutdown(socket.SHUT_RDWR)
@@ -62,9 +62,8 @@ class SocketServerTestCaseMixIn(object):
         self.server.wait_until_queuing_requests()
         client_sock = socket.socket(socket.AF_INET, socket_type)
         client_sock.connect((self.host, self.port))
-        send_through_socket(client_sock, data_set)
+        socket_sendall_close(client_sock, data_set)
         in_queue = consume_queue(self.server.queue, len(data_set))
-        self.server.shutdown()
         return in_queue
 
 
