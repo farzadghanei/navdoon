@@ -62,7 +62,7 @@ The `statsdmetrics <https://pypi.python.org/pypi/statsdmetrics>`_ Python module
 is the only dependency to run navdoon.
 However these Python modules are recommended on development/test environment:
 
-* `distutilazy <https://pypi.python.org/pypi/distutilazy>`_ (>=0.4.1): helpful commands added to `setup.py` to run tests and clean temp files
+* `distutilazy <https://pypi.python.org/pypi/distutilazy>`_ (>=0.4.2): helpful commands added to `setup.py` to run tests and clean temp files
 * `typing <https://pypi.python.org/pypi/typing>`_ (>=3.5.0): standard type annotations for Python
 * `coveage <https://pypi.python.org/pypi/coverage>`_: create test coverage reports
 

@@ -12,9 +12,9 @@ import socket
 import sys
 import logging
 import logging.handlers
+import signal
 from argparse import ArgumentParser, FileType
 from threading import RLock, Thread
-from signal import signal, SIGINT, SIGTERM, SIGHUP
 from time import sleep
 
 import navdoon
@@ -291,10 +291,16 @@ class App(LoggerMixIn):
                     "The value for collector_threads_limit can not be less than collector_threads")
 
     def _register_signal_handlers(self):
-        signal(SIGINT, self._handle_signal_int)
-        signal(SIGTERM, self._handle_signal_term)
-        #FIXME: uncomment this after fixing reload
-        #signal(SIGHUP, self._handle_signal_hup)
+        signal.signal(signal.SIGINT, self._handle_signal_int)
+        signal.signal(signal.SIGTERM, self._handle_signal_term)
+        # we can not set a handler for SIGHUP on Windows
+        if hasattr(signal, 'SIGHUP'):
+            try:
+                #FIXME: uncomment this after fixing reload
+                #signal.signal(signal.SIGHUP, self._handle_signal_hup)
+                pass
+            except ValueError:
+                pass
 
     def _handle_signal_int(self, *args):
         self._log("received SIGINT")
