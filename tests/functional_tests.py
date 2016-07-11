@@ -70,9 +70,11 @@ class TestNavdoonStatsdServer(TestCase):
                 sleep(sleep_time)
 
     def tearDown(self):
-        self.app_proc.kill()
+        self.app_proc.poll()
+        if self.app_proc.returncode is None:
+            self.app_proc.kill()
 
-    @skip("test is incomplete")
+    @skip('test is not complete')
     def test_udp_collectors_flushing_stdout(self):
         client = Client("localhost", self.__class__.udp_port)
         for i in range(1, 5):
@@ -84,6 +86,9 @@ class TestNavdoonStatsdServer(TestCase):
         self.app_proc.terminate()
         self._wait_until_server_shuts_down()
         flushed_metrics, logs = self.app_proc.communicate()
+        flushed_metrics = [l.strip() for l in flushed_metrics.split()]
+        self.assertGreater(len(flushed_metrics), 6, 'flushed enough metrics')
+
 
 
 if __name__ == '__main__':
