@@ -99,8 +99,10 @@ class Server(LoggerMixIn):
             start_time = time()
             self._shutdown_collectors(timeout)
             if self._queue_processor.is_processing():
-                self._shutdown_queue_processor(process_queue, max(
-                    0.1, timeout - (time() - start_time)) if timeout else None)
+                queue_timeout = max(0.1, timeout - (time() - start_time)) if timeout else None
+                self._shutdown_queue_processor(process_queue, queue_timeout)
+            else:
+                self._log_debug("queue processor is not processing")
             self._close_queue()
             self._shutdown.set()
 
@@ -182,21 +184,28 @@ class Server(LoggerMixIn):
                 "Server shutdown timeout when shutting down processor")
 
     def _shutdown_collectors(self, timeout=None):
+        if not self._collectors:
+            return
+
         start_time = time()
-        if self._collectors:
-            self._log_debug("shutting down {} collectors ...".format(len(
-                self._collectors)))
-            for collector in self._collectors:
-                collector.shutdown()
-                collector.wait_until_shutdown(timeout)
-                if timeout is not None:
-                    time_elapsed = time() - start_time
-                    if time_elapsed > timeout:
-                        self._log_error(
-                            "Collectors shutdown timeout after "
-                            "{} seconds".format(time_elapsed))
-                        raise Exception(
-                            "Server shutdown timed out when "
-                            "shutting down collectors")
-                    else:
-                        timeout -= time_elapsed
+        self._log_debug("shutting down {} collectors ...".format(len(
+            self._collectors)))
+
+        for collector in self._collectors:
+            self._log_debug("shutting down {}".format(collector))
+            collector.shutdown()
+            collector.wait_until_shutdown(timeout)
+            self._log("{} shutdown successfully!".format(collector))
+            if timeout is None:
+                continue
+            time_elapsed = time() - start_time
+            if time_elapsed > timeout:
+                self._log_error(
+                    "collectors shutdown timeout after "
+                    "{} seconds".format(time_elapsed))
+                raise Exception(
+                    "Server shutdown timed out when "
+                    "shutting down collectors")
+            else:
+                timeout -= time_elapsed
+        self._log_debug("all collectors shutdown")

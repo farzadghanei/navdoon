@@ -5,9 +5,11 @@ System utilities and mixin classes
 """
 
 import platform
+from time import time
 from multiprocessing import cpu_count
 from threading import Thread, RLock, Event
 from navdoon.pystdlib.queue import Queue, Empty
+from navdoon.utils.common import LoggerMixIn
 
 
 PLATFORM_NAME = platform.system().strip().lower()
@@ -39,12 +41,13 @@ class WorkerThread(Thread):
         self.queue = queue
         self.stop_event = stop_event
         self.results = results
-        Thread.__init__(self, target=self._consume_queue)
+        Thread.__init__(self)
 
     def _consume_queue(self):
-        while not self.stop_event.is_set():
+        should_stop = self.stop_event.is_set
+        while not should_stop():
             try:
-                self._run_task_from_queue(1)
+                self._run_task_from_queue(timeout=1)
             except Empty:
                 pass
 
@@ -54,6 +57,9 @@ class WorkerThread(Thread):
         self.results[task_id] = result
         self.queue.task_done()
 
+    def run(self):
+        self._consume_queue()
+
 
 class TemporaryWorkerThread(WorkerThread):
     """A worker thread that only consumes the queue as long as the queue is not
@@ -61,15 +67,17 @@ class TemporaryWorkerThread(WorkerThread):
     """
 
     def _consume_queue(self):
-        while not self.stop_event.is_set():
+        should_stop = self.stop_event.is_set
+        while not should_stop():
             try:
                 self._run_task_from_queue(1)
             except Empty:
                 break
 
 
-class ThreadPool(object):
+class ThreadPool(LoggerMixIn):
     def __init__(self, size):
+        LoggerMixIn.__init__(self)
         self._size = int(size)
         self._threads = []
         self._queue = Queue()
@@ -77,9 +85,11 @@ class ThreadPool(object):
         self._task_counter = 0
         self._task_results = dict()
         self._stop_event = Event()
+        self.log_signature = "threadpool "
 
     def __del__(self):
-        self.stop()
+        if not self._stop_event.is_set():
+            self.stop()
 
     @property
     def size(self):
@@ -113,11 +123,24 @@ class ThreadPool(object):
         self._queue.join()
         return self
 
-    def stop(self, wait=True):
+    def stop(self, wait=True, timeout=None):
         self._stop_event.set()
         if wait:
+            num_threads = len(self._threads)
+            self._log_debug(
+                    "joining {} worker threads ...".format(num_threads))
+            start_time = time()
+            counter = 0
             for thread in self._threads:
-                thread.join()
+                counter += 1
+                self._log_debug("joining thread {} ...".format(counter))
+                thread.join(timeout)
+                if timeout is None:
+                    continue
+                elif time() - start_time > timeout:
+                    raise Exception("Stopping thread pool timedout")
+            self._log_debug("joined worker {} threads".format(num_threads))
+            self._threads = []
 
     def get_result(self, task_id):
         if not task_id in self._task_results:
@@ -181,7 +204,7 @@ class ExpandableThreadPool(ThreadPool):
 
     def _handle_task(self, task_id, func, args, kwargs):
         ThreadPool._handle_task(self, task_id, func, args, kwargs)
-        if self._can_spawn_temp_worker():
+        if not self._stop_event.is_set() and self._can_spawn_temp_worker():
             self._spawn_temp_worker()
 
     def _can_spawn_temp_worker(self):

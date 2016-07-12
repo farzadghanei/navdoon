@@ -192,14 +192,16 @@ class QueueProcessor(LoggerMixIn):
             try:
                 flush(queue_get(timeout=1))
             except QueueEmptyError:
+                self._log_debug("queue is empty, nothing to flush")
                 pass
+        self._log_debug("finished flushing metrics to destination")
 
     def _process_request(self, request):
         self._log_debug("processing metrics: {}".format(str(request)))
         lines = [line.strip() for line in request.split("\n")]
-        stop = self._should_stop_processing
+        should_stop = self._should_stop_processing.is_set
         for line in lines:
-            if stop.is_set():
+            if should_stop():
                 break
             try:
                 metric = parse_metric_from_request(line)

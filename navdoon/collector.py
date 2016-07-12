@@ -17,6 +17,15 @@ from navdoon.utils.system import ExpandableThreadPool
 DEFAULT_PORT = 8125
 
 
+def socket_type_repr(socket_type):
+    sock_types = {
+            socket.SOCK_STREAM: "TCP",
+            socket.SOCK_DGRAM: "UDP"
+            }
+    return sock_types.get(socket_type, "UNKNOWN")
+
+
+
 class AbstractCollector(object):
     """Abstract base class for collectors"""
 
@@ -54,6 +63,9 @@ class AbstractCollector(object):
                     "method '{}'".format(method))
         self._queue = value
 
+    def __repr__(self):
+        return "collector <{}>".format(self.__class__)
+
 
 class SocketServer(LoggerMixIn, AbstractCollector):
     """Collect Statsd metrics via TCP/UDP socket"""
@@ -83,6 +95,13 @@ class SocketServer(LoggerMixIn, AbstractCollector):
     def __del__(self):
         self._do_shutdown()
 
+    def __repr__(self):
+        return "collector.socket_server {}@{}:{}".format(
+                    socket_type_repr(self.socket_type),
+                    self.host,
+                    self.port
+                )
+
     def configure(self, **kargs):
         """Configure the server, setting attributes.
         Returns a list of attribute names that were affected
@@ -101,8 +120,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
             while not self._should_shutdown.is_set():
                 self._shutdown.clear()
                 self._log("starting serving requests on {} {}:{}".format(
-                    self.socket_type == socket.SOCK_STREAM and 'TCP' or 'UDP',
-                    self.host, self.port))
+                    socket_type_repr(self.socket_type), self.host, self.port))
                 self._pre_start()
                 if self.socket_type == socket.SOCK_STREAM:
                     self._queue_requests_tcp()
@@ -125,7 +143,9 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         self._should_shutdown.set()
 
     def wait_until_shutdown(self, timeout=None):
+        self._log_debug("waiting until shutdown ...")
         self._shutdown.wait(timeout)
+        self._log("shutdown successfully")
 
     def _pre_start(self):
         pass
@@ -139,6 +159,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
 
         try:
             self._queuing_requests.set()
+            self._log_debug("starting queuing UDP requests ...")
             while not should_stop():
                 try:
                     data = receive(chunk_size)
@@ -147,10 +168,12 @@ class SocketServer(LoggerMixIn, AbstractCollector):
                 if data:
                     enqueue(data.decode())
         finally:
+            self._log_debug("stopped queuing UDP requests")
             self._queuing_requests.clear()
 
     def _queue_requests_tcp(self):
         stop_event = self._stop_queuing_requests
+        should_stop_accepting = stop_event.is_set
         chunk_size = self.chunk_size
         queue_put_nowait = self._queue.put_nowait
         shutdown_rdwr = socket.SHUT_RDWR
@@ -158,16 +181,18 @@ class SocketServer(LoggerMixIn, AbstractCollector):
 
         thread_pool = ExpandableThreadPool(self.num_worker_threads)
         thread_pool.workers_limit = self.worker_threads_limit
+        thread_pool.logger = self.logger
+        thread_pool.log_signature = "threadpool =< {} ".format(self)
         thread_pool.initialize()
 
         def _enqueue_from_connection(conn):
             buffer_size = chunk_size
             enqueue = queue_put_nowait
             timeout_exception = socket_timeout_exception
-            stop_queue_event = stop_event
+            should_stop_queuing = stop_event.is_set
             receive = conn.recv
             try:
-                while not stop_queue_event.is_set():
+                while not should_stop_queuing():
                     try:
                         buff = receive(buffer_size)
                     except timeout_exception:
@@ -181,13 +206,16 @@ class SocketServer(LoggerMixIn, AbstractCollector):
 
         try:
             self._queuing_requests.set()
-            while not stop_event.is_set():
+            self._log_debug("starting accepting TCP connections ...")
+            while not should_stop_accepting():
                 try:
                     connection = self.socket.accept()[0]
                 except socket_timeout_exception:
                     continue
                 thread_pool.do(_enqueue_from_connection, connection)
-            thread_pool.stop()
+            self._log_debug("stopped accepting TCP connection")
+            thread_pool.stop(10) # TODO: set this timeout from object attrs
+            self._log_debug("stopped enqueuing TCP requests")
         finally:
             self._queuing_requests.clear()
 
