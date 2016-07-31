@@ -13,4 +13,5 @@ docs/_build/
 
 .idea
 .coverage
+.tox
 tags
