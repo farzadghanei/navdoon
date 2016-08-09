@@ -43,8 +43,9 @@ class TestNavdoonStatsdServer(TestCase):
         return [
                 APP_BIN,
                 "--config", CONF_FILE,
-                '--flush-interval', str(cls.flush_interval),
-                '--collect-udp', '127.0.0.1:{}'.format(cls.udp_port)
+                "--flush-interval", str(cls.flush_interval),
+                "--collect-udp", "127.0.0.1:{}".format(cls.udp_port),
+                "--collect-tcp", "127.0.0.1:{}".format(cls.tcp_port)
             ]
 
     def setUp(self):
@@ -71,13 +72,14 @@ class TestNavdoonStatsdServer(TestCase):
         logs = []
         while True:
             if time() - start_time > timeout:
+                logs = [log for log in logs if log.strip() != ""]
                 print("server logs dump")
                 print("================")
                 for log in logs:
                     print(log, file=sys.stderr)
                 raise RuntimeError(
-                        "waiting for pattern {} in server logs timedout".format(
-                            pattern))
+                    "waiting for pattern {} in server logs timedout.".format(
+                        pattern))
             line = self.app_proc.stderr.readline().strip()
             logs.append(line)
             if match(pattern, line):
@@ -114,7 +116,6 @@ class TestNavdoonStatsdServer(TestCase):
             metrics_to_dict(flushed_metrics)
         )
 
-    @skip("TCP collector shutdown has an issue")
     def test_udp_and_tcp_collectors_combine_and_flush_to_stdout(self):
         client = Client("localhost", self.__class__.udp_port)
         tcp_client = TCPClient("localhost", self.__class__.tcp_port)
@@ -132,16 +133,17 @@ class TestNavdoonStatsdServer(TestCase):
         self._wait_until_server_shuts_down()
         flushed_metrics = self.app_proc.communicate()[0].splitlines()
         self.assertGreater(len(flushed_metrics), 9, 'flushed 1 counter and at least 2 x 4 timers')
+
+        self.maxDiff = None
         self.assertDictEqual(
             {
-                "event": 4, "process.count": 4, "process.max": 9.8,
-                "process.min": 8.5, "process.mean": 9,
-                "process.median": 8.7, "query.count": 1, "query.max": 2,
-                "query.min": 2, "query.mean": 2, "query.median": 2
+                "event": 4, "process.count": 3, "process.max": 9.8,
+                "process.min": 8.5, "process.mean": 9.0,
+                "process.median": 8.7, "query.count": 1, "query.max": 2.0,
+                "query.min": 2.0, "query.mean": 2.0, "query.median": 2.0
             },
             metrics_to_dict(flushed_metrics)
         )
-
 
 
 if __name__ == '__main__':
