@@ -178,6 +178,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         queue_put_nowait = self._queue.put_nowait
         shutdown_rdwr = socket.SHUT_RDWR
         socket_timeout_exception = socket.timeout
+        log_debug = self._log_debug
 
         thread_pool = ExpandableThreadPool(self.num_worker_threads)
         thread_pool.workers_limit = self.worker_threads_limit
@@ -185,7 +186,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         thread_pool.log_signature = "threadpool =< {} ".format(self)
         thread_pool.initialize()
 
-        def _enqueue_from_connection(conn):
+        def _enqueue_from_connection(conn, remote_addr):
             buffer_size = chunk_size
             enqueue = queue_put_nowait
             timeout_exception = socket_timeout_exception
@@ -193,13 +194,16 @@ class SocketServer(LoggerMixIn, AbstractCollector):
             receive = conn.recv
             try:
                 while not should_stop_queuing():
+                    log_debug("reading from TCP connection {} ...".format(remote_addr))
                     try:
                         buff = receive(buffer_size)
                     except timeout_exception:
                         continue
                     if not buff:
                         break
+                    log_debug("queuing from TCP connection {} ...".format(remote_addr))
                     enqueue(buff.decode())
+                log_debug("stopped enqueuing from TCP connection {}".format(remote_addr))
             finally:
                 conn.shutdown(shutdown_rdwr)
                 conn.close()
@@ -209,10 +213,11 @@ class SocketServer(LoggerMixIn, AbstractCollector):
             self._log_debug("starting accepting TCP connections ...")
             while not should_stop_accepting():
                 try:
-                    connection = self.socket.accept()[0]
+                    (connection, remote_addr) = self.socket.accept()
+                    connection.settimeout(self.socket_timeout)
                 except socket_timeout_exception:
                     continue
-                thread_pool.do(_enqueue_from_connection, connection)
+                thread_pool.do(_enqueue_from_connection, connection, remote_addr)
             self._log_debug("stopped accepting TCP connection")
             thread_pool.stop(10) # TODO: set this timeout from object attrs
             self._log_debug("stopped enqueuing TCP requests")

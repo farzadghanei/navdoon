@@ -146,3 +146,13 @@ class TestTCPServer(SocketServerTestCaseMixIn, unittest.TestCase):
         in_queue = self.start_server_send_data_and_consume_queue(
             data_set, socket.SOCK_STREAM)
         self.assertEqual(expected_values_in_queue, in_queue)
+
+    def test_shutdown(self):
+        data_set = ("".encode(), "test_messsage".encode(), "name 10|c@0.1".encode())
+        expected_values_in_queue = ''.join([data.decode() for data in data_set])
+        in_queue = self.start_server_send_data_and_consume_queue(
+            data_set, socket.SOCK_STREAM)
+        self.assertEqual(expected_values_in_queue, ''.join(in_queue))
+        self.server.shutdown()
+        self.server.wait_until_shutdown(5)
+        self.assertFalse(self.server.is_queuing_requests())
