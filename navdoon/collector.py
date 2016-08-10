@@ -25,7 +25,6 @@ def socket_type_repr(socket_type):
     return sock_types.get(socket_type, "UNKNOWN")
 
 
-
 class AbstractCollector(object):
     """Abstract base class for collectors"""
 
@@ -178,7 +177,6 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         queue_put_nowait = self._queue.put_nowait
         shutdown_rdwr = socket.SHUT_RDWR
         socket_timeout_exception = socket.timeout
-        log_debug = self._log_debug
 
         thread_pool = ExpandableThreadPool(self.num_worker_threads)
         thread_pool.workers_limit = self.worker_threads_limit
@@ -194,16 +192,13 @@ class SocketServer(LoggerMixIn, AbstractCollector):
             receive = conn.recv
             try:
                 while not should_stop_queuing():
-                    log_debug("reading from TCP connection {} ...".format(remote_addr))
                     try:
                         buff = receive(buffer_size)
                     except timeout_exception:
                         continue
                     if not buff:
                         break
-                    log_debug("queuing from TCP connection {} ...".format(remote_addr))
                     enqueue(buff.decode())
-                log_debug("stopped enqueuing from TCP connection {}".format(remote_addr))
             finally:
                 conn.shutdown(shutdown_rdwr)
                 conn.close()
