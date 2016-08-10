@@ -6,6 +6,7 @@ import os
 import subprocess
 import gc
 from os.path import dirname, abspath
+from random import randint
 from time import time, sleep
 from re import match
 from unittest import TestCase, main, skip
@@ -39,17 +40,21 @@ class TestNavdoonStatsdServer(TestCase):
     flush_interval = 2
 
     @classmethod
-    def create_server_program_args(cls):
+    def create_server_program_args(cls, udp_port=None, tcp_port=None):
+        udp_port = udp_port or cls.udp_port
+        tcp_port = tcp_port or cls.tcp_port
         return [
                 APP_BIN,
                 "--config", CONF_FILE,
                 "--flush-interval", str(cls.flush_interval),
-                "--collect-udp", "127.0.0.1:{}".format(cls.udp_port),
-                "--collect-tcp", "127.0.0.1:{}".format(cls.tcp_port)
+                "--collect-udp", "127.0.0.1:{}".format(udp_port),
+                "--collect-tcp", "127.0.0.1:{}".format(tcp_port)
             ]
 
     def setUp(self):
-        self.app_args = self.create_server_program_args()
+        self.udp_port = randint(8125, 8999)
+        self.tcp_port = randint(8125, 9999)
+        self.app_args = self.create_server_program_args(udp_port=self.udp_port, tcp_port=self.tcp_port)
         self.app_proc = subprocess.Popen(
                 self.app_args,
                 stderr=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -95,7 +100,7 @@ class TestNavdoonStatsdServer(TestCase):
         gc.collect()
 
     def test_udp_collectors_flushing_stdout(self):
-        client = Client("localhost", self.__class__.udp_port)
+        client = Client("localhost", self.udp_port)
         for _ in range(0, 3):
             client.increment("event")
         client.timing("process", 10.1)
@@ -117,8 +122,8 @@ class TestNavdoonStatsdServer(TestCase):
         )
 
     def test_udp_and_tcp_collectors_combine_and_flush_to_stdout(self):
-        client = Client("localhost", self.__class__.udp_port)
-        tcp_client = TCPClient("localhost", self.__class__.tcp_port)
+        client = Client("localhost", self.udp_port)
+        tcp_client = TCPClient("localhost", self.tcp_port)
         for _ in range(0, 2):
             client.increment("event")
             tcp_client.increment("event")
