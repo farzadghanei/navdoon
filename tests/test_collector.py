@@ -141,11 +141,22 @@ class TestTCPServer(SocketServerTestCaseMixIn, unittest.TestCase):
         self.assertEqual(self.server.socket_type, socket.SOCK_STREAM)
 
     def test_queue_requests(self):
-        data_set = ("test message".encode(), )
-        expected_values_in_queue = tuple([data.decode() for data in data_set])
+        data_set = ("test message\nin 2 lines\n".encode(), "resource.cpu 42|g\n".encode())
+        expected_values_in_queue = ''.join([data.decode() for data in data_set])
         in_queue = self.start_server_send_data_and_consume_queue(
             data_set, socket.SOCK_STREAM)
-        self.assertEqual(expected_values_in_queue, in_queue)
+        self.assertEqual(expected_values_in_queue, ''.join(in_queue))
+
+    def test_queue_requests_includes_incomplete_lines(self):
+        long_request = "test message with long message\n" * 500
+        # the long request will break into 2 items in the queue, since the test needs to know the number of items in the
+        # queue to pick, I'm putting an extra item in the data_set so while test consumes the queue, it will get 1 extra
+        # item from the queue to match the number of items put on the queue. looks ugly but I'm fine with it now
+        data_set = (long_request.encode(), "resource.cpu 42|g".encode(), "".encode())
+        expected_values_in_queue = ''.join([data.decode() for data in data_set])
+        in_queue = self.start_server_send_data_and_consume_queue(
+            data_set, socket.SOCK_STREAM)
+        self.assertEqual(expected_values_in_queue, ''.join(in_queue))
 
     def test_shutdown(self):
         data_set = ("".encode(), "test_messsage".encode(), "name 10|c@0.1".encode())

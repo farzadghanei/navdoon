@@ -74,7 +74,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
     def __init__(self, **kargs):
         AbstractCollector.__init__(self)
         LoggerMixIn.__init__(self)
-        self.chunk_size = 65535
+        self.chunk_size = 8196
         self.socket_type = socket.SOCK_DGRAM
         self.socket_timeout = 1
         self.host = '127.0.0.1'
@@ -190,18 +190,31 @@ class SocketServer(LoggerMixIn, AbstractCollector):
             timeout_exception = socket_timeout_exception
             should_stop_queuing = stop_event.is_set
             receive = conn.recv
+            incomplete_line_chunk = ''
             try:
+                self._log_debug("collecting metrics from TCP {}:{} ...".format(remote_addr[0], remote_addr[1]))
                 while not should_stop_queuing():
                     try:
-                        buff = receive(buffer_size)
+                        buff_bytes = receive(buffer_size)
                     except timeout_exception:
                         continue
-                    if not buff:
+                    if not buff_bytes:
                         break
-                    enqueue(buff.decode())
+
+                    buff_lines = buff_bytes.decode().splitlines(True)
+                    if incomplete_line_chunk != '':
+                        buff_lines[0] = incomplete_line_chunk + buff_lines[0]
+                        incomplete_line_chunk = ''
+
+                    if not buff_lines[-1].endswith('\n'):
+                        incomplete_line_chunk = buff_lines.pop()
+
+                    enqueue(''.join(buff_lines))
             finally:
                 conn.shutdown(shutdown_rdwr)
                 conn.close()
+                if incomplete_line_chunk != '':
+                    enqueue(incomplete_line_chunk)
 
         try:
             self._queuing_requests.set()
@@ -209,6 +222,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
             while not should_stop_accepting():
                 try:
                     (connection, remote_addr) = self.socket.accept()
+                    self._log_debug("TCP connection from {}:{} ...".format(remote_addr[0], remote_addr[1]))
                     connection.settimeout(self.socket_timeout)
                 except socket_timeout_exception:
                     continue
