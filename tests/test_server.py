@@ -3,6 +3,8 @@ import logging
 from random import random
 from time import sleep, time
 from threading import Event, Thread
+from unittest import skip
+
 from statsdmetrics import Counter
 from navdoon.destination import AbstractDestination
 from navdoon.processor import QueueProcessor
@@ -132,6 +134,49 @@ class TestServer(unittest.TestCase):
         self.assertFalse(processor.is_processing())
 
         self.assertEqual(10, len(destination.metrics))
+        for metric in destination.metrics:
+            self.assertEqual(3, len(metric))
+            self.assertEqual(metric[0], "test.metric")
+            self.assertGreaterEqual(metric[1], 0)
+            self.assertGreaterEqual(metric[2], start_time)
+
+    @skip("not implemented yet!")
+    def test_reload_stops_collectors_and_processor_and_new_ones_used_in_server_start_thread(self):
+        start_time = time()
+        destination = StubDestination(10)
+        server = Server()
+        processor = server.create_queue_processor()
+        processor.set_destinations([destination])
+        processor.flush_interval = 0.5
+        server.queue_processor = processor
+        metric = Counter('test.metric', 1)
+        collector = StubCollector(data=metric.to_request(), frequency=10)
+        server.set_collectors([collector])
+        server_thread = Thread(target=server.start)
+        server_thread.setDaemon(True)
+        server_thread.start()
+        server.wait_until_running(5)
+        self.assertTrue(server.is_running())
+        destination.wait_until_expected_count_items(10)
+
+        collector2 = StubCollector(data=metric.to_request(), frequency=9)
+        destination2 = StubDestination(5)
+        processor2 = server.create_queue_processor()
+        processor2.set_destinations([destination2])
+        processor2.flush_interval = 0.3
+        server.queue_processor = processor2
+        server.set_collectors([collector2])
+        server.reload()
+        server.wait_until_reload(5)
+        self.assertTrue(server_thread.isAlive())
+        self.assertTrue(server.is_running())
+        self.assertTrue(collector2.is_queuing_requests())
+        self.assertTrue(processor2.is_processing())
+        self.assertFalse(collector.is_queuing_requests())
+        self.assertFalse(processor.is_processing())
+        destination2.wait_until_expected_count_items(10)
+
+        self.assertEqual(5, len(destination2.metrics))
         for metric in destination.metrics:
             self.assertEqual(3, len(metric))
             self.assertEqual(metric[0], "test.metric")
