@@ -2,7 +2,7 @@
 navdoon.server
 --------------
 Define the Statsd server, that uses other components (collector, processor,
-destination) to handle Statsd requests and flushe metrics to specified
+destination) to handle Statsd requests and flush metrics to specified
 destinations.
 """
 
@@ -33,6 +33,7 @@ class Server(LoggerMixIn):
         super(Server, self).__init__()
         self.log_signature = 'server '
         self._collectors = []
+        self._running_collectors = []
         self._running = Event()
         self._shutdown = Event()
         self._running_lock = RLock()
@@ -57,7 +58,7 @@ class Server(LoggerMixIn):
         return self
 
     def start(self):
-        """Starts the queue processor in background then starts all the collectors.
+        """Start the queue processor in background then starts all the collectors.
         Blocks current thread, until shutdown() is called from another thread.
         """
         if not self._collectors:
@@ -73,25 +74,28 @@ class Server(LoggerMixIn):
             queue_thread = self._start_queue_processor(self._queue_processor)
             self._log_debug("started queue processor thread")
             try:
-                self._start_collecting(self._collectors)
+                collector_threads = self._start_collectors()
+                self._running.set()
+                self._log("collectors are running")
+                for thread in collector_threads:
+                    thread.join()
+                self._running_collectors = []
             finally:
                 self._log("stopped, joining queue processor thread")
                 queue_thread.join()
                 self._running.clear()
 
-    def _start_collecting(self, collectors):
-        """Start all the collectors, blocking current thread until collector threads stop"""
+    def _start_collectors(self):
+        """Start collectors in background threads and returns the threads"""
         collector_threads = []
-        self._log_debug("starting {} collectors ...".format(len(collectors)))
-        for collector in collectors:
+        self._log_debug("starting {} collectors ...".format(len(self._collectors)))
+        for collector in self._collectors:
             thread = Thread(target=collector.start)
             collector_threads.append(thread)
             thread.start()
             collector.wait_until_queuing_requests()
-        self._running.set()
-        self._log("collectors are running")
-        for thread in collector_threads:
-            thread.join()
+            self._running_collectors.append(collector)
+        return collector_threads
 
     def is_running(self):
         return self._running.is_set()
@@ -104,7 +108,7 @@ class Server(LoggerMixIn):
         with self._shutdown_lock:
             self._log("shutting down ...")
             start_time = time()
-            self._shutdown_collectors(self._collectors, timeout)
+            self._shutdown_collectors(timeout)
             if self._queue_processor.is_processing():
                 queue_timeout = max(0.1, timeout - (time() - start_time)) if timeout else None
                 self._shutdown_queue_processor(self._queue_processor, process_queue, queue_timeout)
@@ -190,29 +194,35 @@ class Server(LoggerMixIn):
             raise Exception(
                 "Server shutdown timeout when shutting down processor")
 
-    def _shutdown_collectors(self, collectors, timeout=None):
-        if not collectors:
+    def _shutdown_collectors(self, timeout=None):
+        if not self._running_collectors:
             return
 
         start_time = time()
         self._log_debug("shutting down {} collectors ...".format(len(
-            collectors)))
+            self._running_collectors)))
 
-        for collector in collectors:
-            self._log_debug("shutting down {}".format(collector))
-            collector.shutdown()
-            collector.wait_until_shutdown(timeout)
-            self._log("{} shutdown successfully!".format(collector))
-            if timeout is None:
-                continue
-            time_elapsed = time() - start_time
-            if time_elapsed > timeout:
-                self._log_error(
-                    "collectors shutdown timeout after "
-                    "{} seconds".format(time_elapsed))
-                raise Exception(
-                    "Server shutdown timed out when "
-                    "shutting down collectors")
-            else:
-                timeout -= time_elapsed
-        self._log_debug("all collectors shutdown")
+        stopped_collectors = []
+        try:
+            for collector in self._running_collectors:
+                self._log_debug("shutting down {}".format(collector))
+                collector.shutdown()
+                collector.wait_until_shutdown(timeout)
+                self._log("{} shutdown successfully!".format(collector))
+                stopped_collectors.append(collector)
+                if timeout is None:
+                    continue
+                time_elapsed = time() - start_time
+                if time_elapsed > timeout:
+                    self._log_error(
+                        "collectors shutdown timeout after "
+                        "{} seconds".format(time_elapsed))
+                    raise Exception(
+                        "Server shutdown timed out when "
+                        "shutting down collectors")
+                else:
+                    timeout -= time_elapsed
+            self._log_debug("all collectors shutdown")
+        finally:
+            for collector in stopped_collectors:
+                self._running_collectors.remove(collector)
