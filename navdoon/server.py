@@ -36,10 +36,14 @@ class Server(LoggerMixIn):
         self._running_collectors = []
         self._running = Event()
         self._shutdown = Event()
+        self._reload = Event()
+        self._pause = Event()
+        self._should_reload = Event()
         self._running_lock = RLock()
-        self._shutdown_lock = RLock()
+        self._pause_lock = RLock()
         self._queue = self._create_queue()
         self._queue_processor = None
+        self._running_queue_processor = None
 
     @property
     def queue_processor(self):
@@ -68,22 +72,36 @@ class Server(LoggerMixIn):
                 "no queue processor provided. Creating a queue processor "
                 "with no destinations")
             self._queue_processor = self.create_queue_processor()
+        reloading = False
+        keep_running = True
         with self._running_lock:
             self._log("starting ...")
-            self._share_queue()
-            queue_thread = self._start_queue_processor(self._queue_processor)
-            self._log_debug("started queue processor thread")
-            try:
-                collector_threads = self._start_collectors()
-                self._running.set()
-                self._log("collectors are running")
-                for thread in collector_threads:
-                    thread.join()
-                self._running_collectors = []
-            finally:
-                self._log("stopped, joining queue processor thread")
-                queue_thread.join()
-                self._running.clear()
+            while keep_running:
+                self._should_reload.clear()
+                self._share_queue()
+                queue_thread = self._start_queue_processor()
+                self._log_debug("started queue processor thread")
+                try:
+                    collector_threads = self._start_collectors()
+                    self._running.set()
+                    if reloading:
+                        self._reload.set()
+                    self._log("collectors are running")
+                    self._pause.wait()
+                    self._pause.clear()
+                    self._shutdown_collectors()
+                    for thread in collector_threads:
+                        thread.join()
+                    self._running_collectors = []
+                    self._shutdown_queue_processor(False)
+                finally:
+                    self._log("stopped, joining queue processor thread")
+                    queue_thread.join()
+                    self._running.clear()
+                reloading = self._should_reload.is_set()
+                keep_running = reloading
+                if reloading:
+                    self._log("reloading ...")
 
     def _start_collectors(self):
         """Start collectors in background threads and returns the threads"""
@@ -105,15 +123,16 @@ class Server(LoggerMixIn):
 
     def shutdown(self, process_queue=True, timeout=None):
         """Shutdown the server, stopping the collectors and the queue processor"""
-        with self._shutdown_lock:
+        with self._pause_lock:
             self._log("shutting down ...")
             start_time = time()
             self._shutdown_collectors(timeout)
             if self._queue_processor.is_processing():
                 queue_timeout = max(0.1, timeout - (time() - start_time)) if timeout else None
-                self._shutdown_queue_processor(self._queue_processor, process_queue, queue_timeout)
+                self._shutdown_queue_processor(process_queue, queue_timeout)
             else:
                 self._log_debug("queue processor is not processing")
+            self._pause.set()
             self._close_queue()
             self._shutdown.set()
 
@@ -133,7 +152,13 @@ class Server(LoggerMixIn):
         return processor
 
     def reload(self):
-        raise NotImplementedError()
+        with self._pause_lock:
+            self._reload.clear()
+            self._should_reload.set()
+            self._pause.set()
+
+    def wait_until_reload(self, timeout=None):
+        self._reload.wait(timeout)
 
     @staticmethod
     def _use_multiprocessing():
@@ -143,8 +168,7 @@ class Server(LoggerMixIn):
 
     @classmethod
     def _create_queue(cls):
-        return multiprocessing.Queue() if cls._use_multiprocessing(
-        ) else queue.Queue()
+        return multiprocessing.Queue() if cls._use_multiprocessing() else queue.Queue()
 
     def _share_queue(self):
         queue_ = self._queue
@@ -159,40 +183,43 @@ class Server(LoggerMixIn):
                 queue_.close()
         self._queue = None
 
-    def _start_queue_processor(self, processor):
+    def _start_queue_processor(self):
         if self._use_multiprocessing():
             self._log_debug("stating queue processor in a separate process")
-            queue_process = multiprocessing.Process(
-                target=processor.process)
+            queue_process = multiprocessing.Process(target=self._queue_processor.process)
             queue_process.start()
         else:
             self._log_debug("stating queue processor in a thread")
-            queue_process = Thread(target=processor.process)
+            queue_process = Thread(target=self._queue_processor.process)
             queue_process.start()
 
-        processor.wait_until_processing(30)
-        if not processor.is_processing():
-            self._log_error(
-                "queue processor didn't start correctly time is up")
-            processor.shutdown()
+        self._queue_processor.wait_until_processing(30)
+        if not self._queue_processor.is_processing():
+            self._log_error("queue processor didn't start correctly time is up")
+            self._queue_processor.shutdown()
             queue_process.join()
             raise Exception("Failed to start the queue processor")
-
+        self._running_queue_processor = self._queue_processor
         return queue_process
 
-    def _shutdown_queue_processor(self, processor, process=True, timeout=None):
+    def _shutdown_queue_processor(self, process=True, timeout=None):
+        if not self._running_queue_processor:
+            return False
         start_time = time()
         self._log_debug("shutting down the queue processor ...")
-        self._queue.put_nowait(processor.stop_process_token)
-        if not process:
-            processor.shutdown()
-        processor.wait_until_shutdown(timeout)
-        if processor.is_processing():
+        if process:
+            self._queue.put_nowait(self._running_queue_processor.stop_process_token)
+        else:
+            self._running_queue_processor.shutdown()
+        self._running_queue_processor.wait_until_shutdown(timeout)
+        if self._running_queue_processor.is_processing():
             self._log_error(
                 "Queue processor shutdown timeout after {} seconds".format(
                     time() - start_time))
             raise Exception(
                 "Server shutdown timeout when shutting down processor")
+        self._running_queue_processor = None
+        return True
 
     def _shutdown_collectors(self, timeout=None):
         if not self._running_collectors:
