@@ -13,15 +13,14 @@ from navdoon.pystdlib.queue import Queue
 from navdoon.utils.common import LoggerMixIn
 from navdoon.utils.system import ExpandableThreadPool
 
-
 DEFAULT_PORT = 8125
 
 
 def socket_type_repr(socket_type):
     sock_types = {
-            socket.SOCK_STREAM: "TCP",
-            socket.SOCK_DGRAM: "UDP"
-            }
+        socket.SOCK_STREAM: "TCP",
+        socket.SOCK_DGRAM: "UDP"
+    }
     return sock_types.get(socket_type, "UNKNOWN")
 
 
@@ -55,7 +54,7 @@ class AbstractCollector(object):
 
     @queue.setter
     def queue(self, value):
-        for method in ('put_nowait', ):
+        for method in ('put_nowait',):
             if not callable(getattr(value, method, None)):
                 raise ValueError(
                     "Invalid queue for collector. Queue is missing "
@@ -96,10 +95,10 @@ class SocketServer(LoggerMixIn, AbstractCollector):
 
     def __repr__(self):
         return "collector.socket_server {}@{}:{}".format(
-                    socket_type_repr(self.socket_type),
-                    self.host,
-                    self.port
-                )
+            socket_type_repr(self.socket_type),
+            self.host,
+            self.port
+        )
 
     def configure(self, **kargs):
         """Configure the server, setting attributes.
@@ -184,7 +183,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         thread_pool.log_signature = "threadpool =< {} ".format(self)
         thread_pool.initialize()
 
-        def _enqueue_from_connection(conn, remote_addr):
+        def _enqueue_from_connection(conn, address):
             buffer_size = chunk_size
             enqueue = queue_put_nowait
             timeout_exception = socket_timeout_exception
@@ -192,7 +191,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
             receive = conn.recv
             incomplete_line_chunk = ''
             try:
-                self._log_debug("collecting metrics from TCP {}:{} ...".format(remote_addr[0], remote_addr[1]))
+                self._log_debug("collecting metrics from TCP {}:{} ...".format(address[0], address[1]))
                 while not should_stop_queuing():
                     try:
                         buff_bytes = receive(buffer_size)
@@ -228,7 +227,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
                     continue
                 thread_pool.do(_enqueue_from_connection, connection, remote_addr)
             self._log_debug("stopped accepting TCP connection")
-            thread_pool.stop(10) # TODO: set this timeout from object attrs
+            thread_pool.stop(10)  # TODO: set this timeout from object attrs
             self._log_debug("stopped enqueuing TCP requests")
         finally:
             self._queuing_requests.clear()

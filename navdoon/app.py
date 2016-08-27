@@ -27,6 +27,7 @@ from navdoon.utils.system import os_syslog_socket
 
 LOG_LEVEL_NAMES = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')
 
+
 def parse_config_file(file_):
     """Parse app configurations from contents of a file"""
 
@@ -48,7 +49,7 @@ def parse_config_file(file_):
 
 def default_syslog_socket():
     return os_syslog_socket() or 'localhost:{}'.format(
-                                logging.handlers.SYSLOG_UDP_PORT)
+        logging.handlers.SYSLOG_UDP_PORT)
 
 
 class App(LoggerMixIn):
@@ -83,7 +84,7 @@ class App(LoggerMixIn):
                     log_file=None,
                     log_stderr=False,
                     log_syslog=False,
-                    syslog_socket= default_syslog_socket(),
+                    syslog_socket=default_syslog_socket(),
                     flush_interval=1,
                     flush_stdout=False,
                     flush_graphite='',
@@ -120,7 +121,7 @@ class App(LoggerMixIn):
         collectors = []
         if self._config.get('collect_tcp'):
             tcp_collectors = self._create_socket_servers(
-                    self._config['collect_tcp'], socket.SOCK_STREAM)
+                self._config['collect_tcp'], socket.SOCK_STREAM)
             for collector in tcp_collectors:
                 collector.num_worker_threads = self._config['collector_threads']
                 collector.worker_threads_limit = self._config['collector_threads_limit']
@@ -248,7 +249,7 @@ class App(LoggerMixIn):
         parser.add_argument('--syslog-socket',
                             default=default_syslog_socket(),
                             help='syslog server socket address. '
-                            'socket path, or host:port for UDP'
+                                 'socket path, or host:port for UDP'
                             )
         parser.add_argument('--flush-interval',
                             type=float,
@@ -258,7 +259,7 @@ class App(LoggerMixIn):
                             help='flush to standard output')
         parser.add_argument('--flush-graphite',
                             help='comma separated graphite addresses to flush '
-                                    'stats to, each in host[:port] format',
+                                 'stats to, each in host[:port] format',
                             default=None)
         parser.add_argument('--collect-udp',
                             help='listen on UDP addresses to collect stats')
@@ -266,15 +267,14 @@ class App(LoggerMixIn):
                             help='listen on TCP addresses to collect stats')
         parser.add_argument('--collector-threads',
                             help='number of threads started by each collector'
-                            ' (TCP collectors only)',
+                                 ' (TCP collectors only)',
                             type=int
                             )
         parser.add_argument('--collector-threads-limit',
                             help='max number of threads running by each collector'
-                            ' (TCP collectors only)',
+                                 ' (TCP collectors only)',
                             type=int
                             )
-
 
         return parser.parse_args(args)
 
@@ -287,9 +287,9 @@ class App(LoggerMixIn):
             if key in greater_than_one_args and value < 1:
                 raise ValueError("The value for {} can not be less than 1".format(key))
         if args['collector_threads_limit'] != 0 \
-            and args['collector_threads_limit'] < args['collector_threads']:
-                raise ValueError(
-                    "The value for collector_threads_limit can not be less than collector_threads")
+                and args['collector_threads_limit'] < args['collector_threads']:
+            raise ValueError(
+                "The value for collector_threads_limit can not be less than collector_threads")
 
     def _register_signal_handlers(self):
         signal.signal(signal.SIGINT, self._handle_signal_int)
@@ -297,8 +297,8 @@ class App(LoggerMixIn):
         # we can not set a handler for SIGHUP on Windows
         if hasattr(signal, 'SIGHUP'):
             try:
-                #FIXME: uncomment this after fixing reload
-                #signal.signal(signal.SIGHUP, self._handle_signal_hup)
+                # FIXME: uncomment this after fixing reload
+                # signal.signal(signal.SIGHUP, self._handle_signal_hup)
                 pass
             except ValueError:
                 pass
@@ -332,7 +332,7 @@ class App(LoggerMixIn):
                 syslog_address = syslog_address[0].strip()
             else:
                 syslog_address = tuple([syslog_address[0].strip(),
-                                      int(syslog_address[1])])
+                                        int(syslog_address[1])])
             logger.addHandler(logging.handlers.SysLogHandler(syslog_address))
         return logger
 

@@ -11,7 +11,6 @@ from threading import Thread, RLock, Event
 from navdoon.pystdlib.queue import Queue, Empty
 from navdoon.utils.common import LoggerMixIn
 
-
 PLATFORM_NAME = platform.system().strip().lower()
 
 
@@ -128,7 +127,7 @@ class ThreadPool(LoggerMixIn):
         if wait:
             num_threads = len(self._threads)
             self._log_debug(
-                    "joining {} worker threads ...".format(num_threads))
+                "joining {} worker threads ...".format(num_threads))
             start_time = time()
             counter = 0
             for thread in self._threads:
@@ -143,7 +142,7 @@ class ThreadPool(LoggerMixIn):
             self._threads = []
 
     def get_result(self, task_id):
-        if not task_id in self._task_results:
+        if task_id not in self._task_results:
             raise ValueError(
                 "No results found for task id '{}'".format(task_id))
         return self._task_results[task_id]
@@ -164,12 +163,11 @@ class ThreadPool(LoggerMixIn):
 
 
 class ExpandableThreadPool(ThreadPool):
-
     def __init__(self, size, workers_limit=0):
         ThreadPool.__init__(self, size)
         self._spawn_worker_threshold = 0.5
         self._max_workers_count = 0
-        self.workers_limit = workers_limit
+        self._workers_limit = workers_limit
 
     @property
     def workers_limit(self):
@@ -209,7 +207,7 @@ class ExpandableThreadPool(ThreadPool):
 
     def _can_spawn_temp_worker(self):
         return self._queue.qsize() > (self._spawn_worker_threshold * self._size) \
-                and (self._workers_limit == 0 or len(self._threads) < self._workers_limit)
+               and (self._workers_limit == 0 or len(self._threads) < self._workers_limit)
 
     def _spawn_temp_worker(self):
         thread = TemporaryWorkerThread(self._queue, self._stop_event, self._task_results)
