@@ -3,10 +3,12 @@ from __future__ import absolute_import, print_function
 
 import sys
 import os
+import signal
 import subprocess
 import gc
 from os.path import dirname, abspath
 from random import randint
+from tempfile import mkstemp
 from time import time, sleep
 from re import match
 from unittest import TestCase, main, skip
@@ -62,10 +64,17 @@ def wait_until_server_starts_collecting(process, timeout=10):
     wait_until_log_matches(process, '.*server.+collectors.+are\s+running', timeout, 0.05)
 
 
+def write_to_file(filename, content):
+    with open(filename, 'wt') as fh:
+        fh.write(content)
+
+
 class TestNavdoonStatsdServer(TestCase):
     @staticmethod
-    def create_server_program_args(config=CONF_FILE, udp_port=None, tcp_port=None, flush_interval=1):
-        program_args = [APP_BIN, '--flush-interval', str(flush_interval)]
+    def create_server_program_args(config=CONF_FILE, udp_port=None, tcp_port=None, flush_interval=None):
+        program_args = [APP_BIN]
+        if flush_interval is not None:
+            program_args.extend(('--flush-interval', str(flush_interval)))
         if config is not None:
             program_args.extend(('--config', config))
         if udp_port is not None:
@@ -87,6 +96,7 @@ class TestNavdoonStatsdServer(TestCase):
 
     def setUp(self):
         self.app_process = None
+        self.remove_files = []
 
     def tearDown(self):
         if self.app_process is not None:
@@ -95,6 +105,9 @@ class TestNavdoonStatsdServer(TestCase):
                 self.app_process.kill()
             self.app_process = None
             gc.collect()
+        for filename in self.remove_files:
+            if os.path.exists(filename):
+                os.unlink(filename)
 
     def test_udp_collectors_flushing_stdout(self):
         udp_port = randint(8125, 8999)
@@ -151,6 +164,75 @@ class TestNavdoonStatsdServer(TestCase):
                 "event": 4, "process.count": 3, "process.max": 9.8,
                 "process.min": 8.5, "process.mean": 9.0,
                 "process.median": 8.7, "query.count": 1, "query.max": 2.0,
+                "query.min": 2.0, "query.mean": 2.0, "query.median": 2.0
+            },
+            metrics_to_dict(flushed_metrics)
+        )
+
+    @skip("reloading failes due to queue process set_destinations fail")
+    def test_reload_server_keeps_the_queue(self):
+        tcp_port = randint(8125, 9999)
+        _, config_filename = mkstemp(text=True)
+        self.remove_files.append(config_filename)
+        write_to_file(
+            config_filename,
+            """
+[navdoon]
+log-level=DEBUG
+log-stderr=true
+flush-stdout=true
+collect-tcp=127.0.0.1:{}
+flush-interval=30
+""".format(tcp_port)
+        )
+        self.app_process = self.create_server_process(config=config_filename)
+        print("TCP server started!")
+        tcp_client = TCPClient("localhost", tcp_port)
+        for _ in range(0, 2):
+            tcp_client.increment("event")
+        tcp_client.timing("query", 2)
+        del tcp_client
+        print("TCP requests finished!")
+
+        udp_port = randint(8125, 8999)
+        flush_interval = 3
+        write_to_file(
+            config_filename,
+            """
+[navdoon]
+log-level=DEBUG
+log-stderr=true
+flush-stdout=true
+collect-udp=127.0.0.1:{}
+flush-interval={}
+""".format(udp_port, flush_interval)
+        )
+        print("reloading ...")
+        self.app_process.send_signal(signal.SIGHUP)
+
+        wait_until_server_starts_collecting(self.app_process, 5)
+        print("removing temp file file")
+        os.remove(config_filename)
+
+        client = Client("localhost", udp_port)
+        for _ in range(0, 2):
+            client.increment("event")
+        tcp_client.timing("query", 4)
+
+        # wait for at least 1 flush
+        sleep(flush_interval)
+
+        # self.assertRaises(Exception, TCPClient, "localhost", tcp_port)
+
+        self.app_process.terminate()
+        wait_until_server_shuts_down(self.app_process)
+        flushed_metrics = self.app_process.communicate()[0].splitlines()
+        self.assertGreater(len(flushed_metrics), 5, 'flushed 1 counter and at least 1 x 4 timers')
+
+        self.maxDiff = None
+        self.assertDictEqual(
+            {
+                "event": 4, "query.count": 2, "query.max": 4.0,
                 "query.min": 2.0, "query.mean": 2.0, "query.median": 2.0
             },
             metrics_to_dict(flushed_metrics)
