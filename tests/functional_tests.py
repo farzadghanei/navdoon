@@ -19,7 +19,6 @@ except ImportError:
 from statsdmetrics.client import Client
 from statsdmetrics.client.tcp import TCPClient
 
-
 TEST_DIR = dirname(abspath(__file__))
 BASE_DIR = dirname(TEST_DIR)
 CONF_FILE = os.path.join(TEST_DIR, 'fixtures', 'functional_test_config.ini')
@@ -34,83 +33,85 @@ def metrics_to_dict(metrics):
     return result
 
 
-class TestNavdoonStatsdServer(TestCase):
-    tcp_port = 8126
-    udp_port = 8125
-    flush_interval = 2
+def wait_until_log_matches(process, pattern, timeout=10, sleep_time=None):
+    start_time = time()
+    logs = []
+    while True:
+        if time() - start_time > timeout:
+            logs = [log for log in logs if log.strip() != ""]
+            print("server logs dump")
+            print("================")
+            for log in logs:
+                print(log, file=sys.stderr)
+            raise RuntimeError(
+                "waiting for pattern {} in server logs timedout.".format(
+                    pattern))
+        line = process.stderr.readline().strip()
+        logs.append(line)
+        if match(pattern, line):
+            break
+        if sleep_time:
+            sleep(sleep_time)
 
-    @classmethod
-    def create_server_program_args(cls, udp_port=None, tcp_port=None):
-        udp_port = udp_port or cls.udp_port
-        tcp_port = tcp_port or cls.tcp_port
-        return [
-                APP_BIN,
-                "--config", CONF_FILE,
-                "--flush-interval", str(cls.flush_interval),
-                "--collect-udp", "127.0.0.1:{}".format(udp_port),
-                "--collect-tcp", "127.0.0.1:{}".format(tcp_port)
-            ]
+
+def wait_until_server_shuts_down(process, timeout=20):
+    wait_until_log_matches(process, '.*server shutdown successfully', timeout, 0.05)
+
+
+def wait_until_server_starts_collecting(process, timeout=10):
+    wait_until_log_matches(process, '.*server.+collectors.+are\s+running', timeout, 0.05)
+
+
+class TestNavdoonStatsdServer(TestCase):
+    @staticmethod
+    def create_server_program_args(config=CONF_FILE, udp_port=None, tcp_port=None, flush_interval=1):
+        program_args = [APP_BIN, '--flush-interval', str(flush_interval)]
+        if config is not None:
+            program_args.extend(('--config', config))
+        if udp_port is not None:
+            program_args.extend(('--collect-udp', '127.0.0.1:{}'.format(udp_port)))
+        if tcp_port is not None:
+            program_args.extend(('--collect-tcp', '127.0.0.1:{}'.format(tcp_port)))
+        return program_args
+
+    def create_server_process(self, *args, **kwargs):
+        app_args = self.create_server_program_args(*args, **kwargs)
+        app_process = subprocess.Popen(app_args, stderr=subprocess.PIPE, stdout=subprocess.PIPE,
+                                       universal_newlines=True)
+        try:
+            wait_until_server_starts_collecting(app_process)
+        except RuntimeError as error:
+            app_process.kill()
+            raise error
+        return app_process
 
     def setUp(self):
-        self.udp_port = randint(8125, 8999)
-        self.tcp_port = randint(8125, 9999)
-        self.app_args = self.create_server_program_args(udp_port=self.udp_port, tcp_port=self.tcp_port)
-        self.app_proc = subprocess.Popen(
-                self.app_args,
-                stderr=subprocess.PIPE, stdout=subprocess.PIPE,
-                universal_newlines=True,
-                )
-        try:
-            self._wait_until_server_starts_collecting()
-        except RuntimeError as error:
-            self.app_proc.kill()
-            raise error
-
-    def _wait_until_server_starts_collecting(self, timeout=10):
-        self._wait_until_log_matches('.*server.+collectors.+are\s+running', timeout, 0.05)
-
-    def _wait_until_server_shuts_down(self, timeout=20):
-        self._wait_until_log_matches('.*server shutdown successfully', timeout, 0.05)
-
-    def _wait_until_log_matches(self, pattern, timeout=10, sleep_time=None):
-        start_time = time()
-        logs = []
-        while True:
-            if time() - start_time > timeout:
-                logs = [log for log in logs if log.strip() != ""]
-                print("server logs dump")
-                print("================")
-                for log in logs:
-                    print(log, file=sys.stderr)
-                raise RuntimeError(
-                    "waiting for pattern {} in server logs timedout.".format(
-                        pattern))
-            line = self.app_proc.stderr.readline().strip()
-            logs.append(line)
-            if match(pattern, line):
-                break
-            if sleep_time:
-                sleep(sleep_time)
+        self.app_process = None
 
     def tearDown(self):
-        self.app_proc.poll()
-        if self.app_proc.returncode is None:
-            self.app_proc.kill()
-        self.app_proc = None
-        gc.collect()
+        if self.app_process is not None:
+            self.app_process.poll()
+            if self.app_process.returncode is None:
+                self.app_process.kill()
+            self.app_process = None
+            gc.collect()
 
     def test_udp_collectors_flushing_stdout(self):
-        client = Client("localhost", self.udp_port)
+        udp_port = randint(8125, 8999)
+        flush_interval = 2
+        self.app_process = self.create_server_process(udp_port=udp_port, flush_interval=flush_interval)
+
+        client = Client("localhost", udp_port)
         for _ in range(0, 3):
             client.increment("event")
         client.timing("process", 10.1)
         client.timing("process", 10.2)
         client.timing("process", 10.3)
         # wait for at least 1 flush
-        sleep(self.__class__.flush_interval)
-        self.app_proc.terminate()
-        self._wait_until_server_shuts_down()
-        flushed_metrics = self.app_proc.communicate()[0].splitlines()
+        sleep(flush_interval)
+        self.app_process.terminate()
+        wait_until_server_shuts_down(self.app_process)
+        flushed_metrics = self.app_process.communicate()[0].splitlines()
         self.assertGreater(len(flushed_metrics), 5, 'flushed 1 counter and at least 4 timers')
         self.assertDictEqual(
             {
@@ -122,8 +123,13 @@ class TestNavdoonStatsdServer(TestCase):
         )
 
     def test_udp_and_tcp_collectors_combine_and_flush_to_stdout(self):
-        client = Client("localhost", self.udp_port)
-        tcp_client = TCPClient("localhost", self.tcp_port)
+        udp_port = randint(8125, 8999)
+        tcp_port = randint(8125, 9999)
+        flush_interval = 2
+        self.app_process = self.create_server_process(udp_port=udp_port, tcp_port=tcp_port,
+                                                      flush_interval=flush_interval)
+        client = Client("localhost", udp_port)
+        tcp_client = TCPClient("localhost", tcp_port)
         for _ in range(0, 2):
             client.increment("event")
             tcp_client.increment("event")
@@ -133,10 +139,10 @@ class TestNavdoonStatsdServer(TestCase):
         tcp_client.timing("process", 8.7)
         tcp_client.timing("query", 2)
         # wait for at least 1 flush
-        sleep(self.__class__.flush_interval)
-        self.app_proc.terminate()
-        self._wait_until_server_shuts_down()
-        flushed_metrics = self.app_proc.communicate()[0].splitlines()
+        sleep(flush_interval)
+        self.app_process.terminate()
+        wait_until_server_shuts_down(self.app_process)
+        flushed_metrics = self.app_process.communicate()[0].splitlines()
         self.assertGreater(len(flushed_metrics), 9, 'flushed 1 counter and at least 2 x 4 timers')
 
         self.maxDiff = None
