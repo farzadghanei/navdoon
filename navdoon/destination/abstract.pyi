@@ -1,7 +1,7 @@
 from typing import List, Tuple, AnyStr
 from abc import abstractmethod
 
-Metrics = List[Tuple(AnyStr, float, float)]
+Metrics = List[Tuple[AnyStr, float, float]]
 
 
 class AbstractDestination(object):

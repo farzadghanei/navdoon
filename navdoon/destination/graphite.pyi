@@ -3,7 +3,7 @@ from navdoon.utils.common import TCPClient
 from navdoon.destination.abstract import AbstractDestination
 
 Lines = List[AnyStr]
-Metrics = List[Tuple(AnyStr, float, float)]
+Metrics = List[Tuple[AnyStr, float, float]]
 
 
 class Graphite(TCPClient, AbstractDestination):

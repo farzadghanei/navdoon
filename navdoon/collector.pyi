@@ -11,7 +11,6 @@ Queue = Union[multiprocessing.Queue, queue.Queue]
 
 class AbstractCollector(object):
     __metaclass__ = ABCMeta
-
     @abstractmethod
     def start(self) -> None: ...
     @abstractmethod

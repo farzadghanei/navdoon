@@ -227,7 +227,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
                     continue
                 thread_pool.do(_enqueue_from_connection, connection, remote_addr)
             self._log_debug("stopped accepting TCP connection")
-            thread_pool.stop(10)  # TODO: set this timeout from object attrs
+            thread_pool.stop(True, 10)  # TODO: set this timeout from object attrs
             self._log_debug("stopped enqueuing TCP requests")
         finally:
             self._queuing_requests.clear()

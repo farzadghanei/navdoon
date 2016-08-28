@@ -1,10 +1,9 @@
-from typing import List, AnyStr, Tuple, io, Union
-from io import FileIO
+from typing import List, AnyStr, Tuple, IO, Union
 from navdoon.destination.abstract import AbstractDestination
 
-Metrics = List[Tuple(AnyStr, float, float)]
+Metrics = List[Tuple[AnyStr, float, float]]
 Lines = List[AnyStr]
-IO = Union[io.IO, FileIO]
+
 
 class Stream(AbstractDestination):
     def __init__(self, file_handle: IO) -> None: ...

@@ -75,4 +75,4 @@ if distutilazy:
 if __name__ == "__main__":
     setup(**setup_params)
 
-__all__ = (setup_params, classifiers, long_description)
+__all__ = ('setup_params', 'classifiers', 'long_description')

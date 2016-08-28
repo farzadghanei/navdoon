@@ -1,5 +1,5 @@
 from typing import AnyStr, Union, Dict, List, Tuple, Set as SetType
-import multiprocessing
+from multiprocessing import Queue as multiprocessingQueue
 from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer)
 from navdoon.pystdlib import queue
 from navdoon.utils.common import LoggerMixIn
@@ -7,8 +7,8 @@ from navdoon.destination import AbstractDestination
 
 
 StatsMetricType = Union[Counter, Gauge, GaugeDelta, Set, Timer]
-Queue = Union[queue.Queue, multiprocessing.Queue]
-Metrics = List[Tuple(AnyStr, float, float)]
+Queue = Union[queue.Queue, multiprocessingQueue]
+Metrics = List[Tuple[AnyStr, float, float]]
 
 class QueueProcessor(LoggerMixIn):
     def __init__(self, queue_: Queue) -> None: ...
