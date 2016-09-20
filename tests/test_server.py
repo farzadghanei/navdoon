@@ -133,7 +133,7 @@ class TestServer(unittest.TestCase):
         self.assertFalse(collector.is_queuing_requests())
         self.assertFalse(processor.is_processing())
 
-        self.assertEqual(10, len(destination.metrics))
+        self.assertGreaterEqual(10, len(destination.metrics))
         for metric in destination.metrics:
             self.assertEqual(3, len(metric))
             self.assertEqual(metric[0], "test.metric")
