@@ -89,28 +89,28 @@ class TestQueueProcessor(unittest.TestCase):
         self.assertRaises(ValueError, processor.set_destinations,
                           "not a destination")
 
-    def test_set_destinations(self):
+    def test_set_destinations_when_not_started_just_sets_the_destinations(self):
         processor = QueueProcessor(Queue())
         destinations = [StubDestination()]
         processor.set_destinations(destinations)
         self.assertEqual(destinations, processor._destinations)
+        self.assertFalse(processor.is_processing())
 
-    def test_set_destinations_fails_if_called_after_process(self):
+    def test_set_destinations_if_called_after_process_stops_old_then_sets_and_starts_new_destinations(self):
         processor = QueueProcessor(Queue())
-        destinations = [StubDestination()]
-        processor.set_destinations(destinations)
-        processor_thread = Thread(target=processor.process)
-        processor_thread.start()
-        processor.wait_until_processing(10)
-        new_destinations = [StubDestination()]
         try:
-            self.assertRaises(Exception, processor.set_destinations, new_destinations)
+            destinations = [StubDestination()]
+            processor.set_destinations(destinations)
+            processor_thread = Thread(target=processor.process)
+            processor_thread.start()
+            processor.wait_until_processing(10)
+            self.assertTrue(processor.is_processing())
+            new_destinations = [StubDestination()]
+            processor.set_destinations(new_destinations)
+            self.assertEqual(new_destinations, processor._destinations)
+            self.assertTrue(processor.is_processing())
         finally:
             processor.shutdown()
-            processor.wait_until_shutdown(10)
-        self.assertEqual(destinations, processor._destinations)
-        processor.set_destinations(new_destinations)
-        self.assertEqual(new_destinations, processor._destinations)
 
     def test_clear_destinations(self):
         destination = StubDestination()
@@ -128,7 +128,7 @@ class TestQueueProcessor(unittest.TestCase):
                    Set('username', 'navdoon.test'),
                    Counter('user.jump', 4),
                    Set('username', 'navdoon'),
-                   Counter('user.jump', -1), )
+                   Counter('user.jump', -1),)
         queue_ = Queue()
         destination = StubDestination()
         destination.expected_count = expected_flushed_metrics_count
@@ -155,7 +155,7 @@ class TestQueueProcessor(unittest.TestCase):
                    Counter('user.login', 3),
                    token,
                    Counter('user.login', -1),
-                   Counter('user.logout', 1), )
+                   Counter('user.logout', 1),)
         queue_ = Queue()
         destination = StubDestination()
         destination.expected_count = expected_flushed_metrics_count
@@ -168,7 +168,7 @@ class TestQueueProcessor(unittest.TestCase):
         processor.wait_until_processing(5)
         for metric in metrics:
             if metric is token:
-                sleep(processor.flush_interval) # make sure one flush happened before token
+                sleep(processor.flush_interval)  # make sure one flush happened before token
                 request = metric
             else:
                 request = metric.to_request()
@@ -245,8 +245,8 @@ class TestQueueProcessor(unittest.TestCase):
         self.assertEqual(new_queue, processor.queue)
 
     def test_process_timers(self):
-        start_tiemstamp = time()
-        expected_flushed_metrics_count = 2 + 5 # each timer has 5 separate metrics
+        start_timestamp = time()
+        expected_flushed_metrics_count = 2 + 5  # each timer has 5 separate metrics
         metrics = (Counter('user.jump', 2),
                    Set('username', 'navdoon'),
                    Timer('db.query', 300),
@@ -254,7 +254,7 @@ class TestQueueProcessor(unittest.TestCase):
                    Counter('user.jump', -1),
                    Timer('db.query', 309),
                    Timer('db.query', 303)
-                )
+                   )
         queue_ = Queue()
         destination = StubDestination()
         destination.expected_count = expected_flushed_metrics_count
@@ -274,7 +274,7 @@ class TestQueueProcessor(unittest.TestCase):
         metrics_dict = dict()
         for (name, value, timestamp) in destination.metrics:
             metrics_dict[name] = value
-            self.assertGreaterEqual(timestamp, start_tiemstamp)
+            self.assertGreaterEqual(timestamp, start_timestamp)
 
         self.assertEqual(metrics_dict['user.jump'], 1)
         self.assertEqual(metrics_dict['username'], 2)
@@ -283,7 +283,6 @@ class TestQueueProcessor(unittest.TestCase):
         self.assertEqual(metrics_dict['db.query.min'], 300)
         self.assertEqual(metrics_dict['db.query.mean'], 304)
         self.assertEqual(metrics_dict['db.query.median'], 303)
-
 
 
 class TestStatsShelf(unittest.TestCase):
