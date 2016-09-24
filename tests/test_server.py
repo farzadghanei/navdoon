@@ -133,7 +133,7 @@ class TestServer(unittest.TestCase):
         self.assertFalse(collector.is_queuing_requests())
         self.assertFalse(processor.is_processing())
 
-        self.assertGreaterEqual(10, len(destination.metrics))
+        self.assertGreaterEqual(len(destination.metrics), 10)
         for metric in destination.metrics:
             self.assertEqual(3, len(metric))
             self.assertEqual(metric[0], "test.metric")
@@ -176,7 +176,7 @@ class TestServer(unittest.TestCase):
         self.assertFalse(processor.is_processing())
         destination2.wait_until_expected_count_items(15)
 
-        self.assertEqual(5, len(destination2.metrics))
+        self.assertEqual(len(destination2.metrics), 5)
         for metric in destination2.metrics:
             self.assertEqual(3, len(metric))
             self.assertEqual(metric[0], "test.metric2")
