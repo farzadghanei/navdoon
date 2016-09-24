@@ -89,14 +89,14 @@ class TestQueueProcessor(unittest.TestCase):
         self.assertRaises(ValueError, processor.set_destinations,
                           "not a destination")
 
-    def test_set_destinations_when_not_started_just_sets_the_destinations(self):
+    def test_set_destinations_when_not_started(self):
         processor = QueueProcessor(Queue())
         destinations = [StubDestination()]
         processor.set_destinations(destinations)
         self.assertEqual(destinations, processor._destinations)
         self.assertFalse(processor.is_processing())
 
-    def test_set_destinations_if_called_after_process_stops_old_then_sets_and_starts_new_destinations(self):
+    def test_destinations_can_change_when_queue_processor_is_running(self):
         processor = QueueProcessor(Queue())
         try:
             destinations = [StubDestination()]
@@ -107,7 +107,7 @@ class TestQueueProcessor(unittest.TestCase):
             self.assertTrue(processor.is_processing())
             new_destinations = [StubDestination()]
             processor.set_destinations(new_destinations)
-            self.assertEqual(new_destinations, processor._destinations)
+            self.assertEqual(new_destinations, processor.get_destinations())
             self.assertTrue(processor.is_processing())
         finally:
             processor.shutdown()
@@ -134,6 +134,7 @@ class TestQueueProcessor(unittest.TestCase):
         destination.expected_count = expected_flushed_metrics_count
         processor = QueueProcessor(queue_)
         processor.set_destinations([destination])
+        processor.init_destinations()
         process_thread = Thread(target=processor.process)
         process_thread.start()
         processor.wait_until_processing(5)
@@ -146,6 +147,7 @@ class TestQueueProcessor(unittest.TestCase):
                          len(destination.metrics))
         self.assertEqual(('user.jump', 5), destination.metrics[0][:2])
         self.assertEqual(('username', 2), destination.metrics[1][:2])
+
 
     def test_process_stops_on_stop_token_in_queue(self):
         token = 'STOP'
@@ -394,3 +396,7 @@ class TestStatsShelf(unittest.TestCase):
         self.assertEqual(dict(), shelf.sets())
         self.assertEqual(dict(), shelf.timers_data())
         self.assertEqual(dict(), shelf.gauges())
+
+
+if __name__ == '__main__':
+    unittest.main()
