@@ -102,11 +102,9 @@ class QueueProcessor(LoggerMixIn):
             flush_thread.start()
             self._flush_queues.append(queue_)
             self._flush_threads.append(flush_thread)
-            self._log_debug("initialized flush thread for {}".format(destination))
 
         self._flush_threads_initialized.set()
-        self._log_debug("initialized {} destination threads".format(
-            len(self._flush_threads)))
+        self._log_debug("initialized {} destination threads".format(len(self._flush_threads)))
 
     def destinations_initialized(self):
         return self._flush_threads_initialized.is_set()
@@ -170,21 +168,15 @@ class QueueProcessor(LoggerMixIn):
                 self._shutdown.set()
 
     def flush(self):
-        self._log_debug("waiting for flushing lock ...")
         with self._flush_lock:
             self._log_debug("flushing lock acquired")
             now = time()
             metrics = self._get_metrics_and_clear_shelf(now)
-            num_queues = len(self._flush_queues)
-            num_threads = len(self._flush_threads)
-            self._log_debug("flushing '{}' metrics to '{}' destinations".format(
-                len(metrics), num_queues))
             for queue_ in self._flush_queues:
                 queue_.put(metrics)
             self._last_flush_timestamp = now
-            self._log("flushed '{}' metrics to '{}' destinations".format(len(metrics), num_queues))
-            if num_queues != num_threads:
-                self._log_warn("number of flush queues={} and threads={} don't match".format(num_queues, num_threads))
+            self._log("flushed '{}' metrics to '{}' destinations".format(len(metrics), len(self._flush_queues)))
+
 
     def shutdown(self):
         if self._processing.is_set():
@@ -203,11 +195,8 @@ class QueueProcessor(LoggerMixIn):
         while not should_stop():
             try:
                 flush(queue_get(timeout=1))
-                self._log_debug("flushed metrics to destination")
             except QueueEmptyError:
-                self._log_debug("destination flush queue is empty, nothing to flush")
                 pass
-        self._log_debug("finished flushing metrics to destination {}".format(destination))
 
     def _process_request(self, request):
         self._log_debug("processing metrics: {}".format(str(request)))

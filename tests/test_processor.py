@@ -148,7 +148,6 @@ class TestQueueProcessor(unittest.TestCase):
         self.assertEqual(('user.jump', 5), destination.metrics[0][:2])
         self.assertEqual(('username', 2), destination.metrics[1][:2])
 
-
     def test_process_stops_on_stop_token_in_queue(self):
         token = 'STOP'
         expected_flushed_metrics_count = 2
