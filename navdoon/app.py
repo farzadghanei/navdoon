@@ -305,11 +305,11 @@ class App(LoggerMixIn):
 
     def _handle_signal_int(self, *args):
         self._log("received SIGINT")
-        self.shutdown(3)
+        self.shutdown()
 
     def _handle_signal_term(self, *args):
         self._log("received SIGTERM")
-        self.shutdown(3)
+        self.shutdown()
 
     def _handle_signal_hup(self, *args):
         self._log("received SIGHUP")
