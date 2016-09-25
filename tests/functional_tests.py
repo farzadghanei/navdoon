@@ -40,7 +40,7 @@ def wait_until_log_matches(process, pattern, timeout=10, sleep_time=None):
     logs = []
     while True:
         if time() - start_time > timeout:
-            logs = [log for log in logs if log.strip() != ""]
+            logs = [log for log in logs if log.strip()]
             print("server logs dump")
             print("================")
             for log in logs:
@@ -62,6 +62,10 @@ def wait_until_server_shuts_down(process, timeout=20):
 
 def wait_until_server_starts_collecting(process, timeout=10):
     wait_until_log_matches(process, '.*server.+collectors.+are\s+running', timeout, 0.05)
+
+
+def wait_until_server_processed_metric(process, name, timeout=10):
+    wait_until_log_matches(process, '.*queue.processor processing metrics:\s*' + name, timeout, 0.1)
 
 
 def write_to_file(filename, content):
@@ -169,7 +173,6 @@ class TestNavdoonStatsdServer(TestCase):
             metrics_to_dict(flushed_metrics)
         )
 
-    @skip("reloading failes due to queue process set_destinations fail")
     def test_reload_server_keeps_the_queue(self):
         tcp_port = randint(8125, 9999)
         _, config_filename = mkstemp(text=True)
@@ -182,20 +185,19 @@ log-level=DEBUG
 log-stderr=true
 flush-stdout=true
 collect-tcp=127.0.0.1:{}
-flush-interval=30
+flush-interval=60
 """.format(tcp_port)
         )
         self.app_process = self.create_server_process(config=config_filename)
-        print("TCP server started!")
         tcp_client = TCPClient("localhost", tcp_port)
         for _ in range(0, 2):
             tcp_client.increment("event")
         tcp_client.timing("query", 2)
         del tcp_client
-        print("TCP requests finished!")
+        wait_until_server_processed_metric(self.app_process, 'event')
 
         udp_port = randint(8125, 8999)
-        flush_interval = 3
+        flush_interval = 5
         write_to_file(
             config_filename,
             """
@@ -207,33 +209,35 @@ collect-udp=127.0.0.1:{}
 flush-interval={}
 """.format(udp_port, flush_interval)
         )
-        print("reloading ...")
-        self.app_process.send_signal(signal.SIGHUP)
 
-        wait_until_server_starts_collecting(self.app_process, 5)
-        print("removing temp file file")
-        os.remove(config_filename)
+        self.app_process.send_signal(signal.SIGHUP)
+        wait_until_server_starts_collecting(self.app_process, 10)
 
         client = Client("localhost", udp_port)
         for _ in range(0, 2):
             client.increment("event")
-        tcp_client.timing("query", 4)
+        client.timing("query", 4)
+        client.increment("finish")
 
+        self.assertRaises(Exception, TCPClient, "localhost", tcp_port)  # TCP collector should be down
+        os.remove(config_filename)
+
+        wait_until_server_processed_metric(self.app_process, 'finish')
         # wait for at least 1 flush
         sleep(flush_interval)
 
-        # self.assertRaises(Exception, TCPClient, "localhost", tcp_port)
-
         self.app_process.terminate()
         wait_until_server_shuts_down(self.app_process)
+
         flushed_metrics = self.app_process.communicate()[0].splitlines()
-        self.assertGreater(len(flushed_metrics), 5, 'flushed 1 counter and at least 1 x 4 timers')
+        self.assertGreaterEqual(len(flushed_metrics), 5)
 
         self.maxDiff = None
         self.assertDictEqual(
             {
                 "event": 4, "query.count": 2, "query.max": 4.0,
-                "query.min": 2.0, "query.mean": 2.0, "query.median": 2.0
+                "query.min": 2.0, "query.mean": 3.0, "query.median": 3.0,
+                "finish": 1
             },
             metrics_to_dict(flushed_metrics)
         )

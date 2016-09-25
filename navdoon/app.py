@@ -298,7 +298,7 @@ class App(LoggerMixIn):
         if hasattr(signal, 'SIGHUP'):
             try:
                 # FIXME: uncomment this after fixing reload
-                # signal.signal(signal.SIGHUP, self._handle_signal_hup)
+                signal.signal(signal.SIGHUP, self._handle_signal_hup)
                 pass
             except ValueError:
                 pass
