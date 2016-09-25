@@ -24,13 +24,13 @@ class DestinationWithoutFlushMethod(object):
 class StubDestination(LoggerMixIn, AbstractDestination):
     def __init__(self, expected_count=0):
         super(StubDestination, self).__init__()
-        self.log_signature = 'test.destination'
+        self.log_signature = 'test.destination '
         self.metrics = []
         self.expected_count = expected_count
         self.flushed_expected_count = Event()
 
     def flush(self, metrics):
-        self._log_debug("{} metrics flushed".format(len(metrics)))
+        self._log_debug("received {} metrics".format(len(metrics)))
         self.metrics.extend(metrics)
         if len(self.metrics) >= self.expected_count:
             self.flushed_expected_count.set()
@@ -183,7 +183,7 @@ class TestQueueProcessor(unittest.TestCase):
         self.assertEqual(('user.login', 4), destination.metrics[0][:2])
         self.assertEqual(('username', 1), destination.metrics[1][:2])
 
-    def test_process_can_resume_after_shutdown_called(self):
+    def test_continues_processing_after_reload(self):
         metrics = (Counter('user.login', 1), Set('username', 'navdoon'),
                    Counter('user.login', 3))
         queue_ = Queue()
@@ -197,33 +197,35 @@ class TestQueueProcessor(unittest.TestCase):
         process_thread.start()
         processor.wait_until_processing(5)
 
+        expected_flushed_metrics2 = 2
+        destination2 = StubDestination()
+        destination2.expected_count = expected_flushed_metrics2
+        processor.set_destinations([destination2])
+
         for metric in metrics:
             queue_.put(metric.to_request())
 
         destination.wait_until_expected_count_items(5)
         processor.shutdown()
         process_thread.join(5)
+        self.assertFalse(processor.is_processing())
         self.assertGreaterEqual(len(destination.metrics), 1)
         self.assertLessEqual(queue_.qsize(), 2)
-        processor.clear_destinations()
 
         for metric in metrics:
             queue_.put(metric.to_request())
 
-        expected_flushed_metrics = len(metrics)
-        destination2 = StubDestination()
-        destination2.expected_count = expected_flushed_metrics
-        processor.set_destinations([destination, destination2])
-
+        self.assertGreaterEqual(queue_.qsize(), len(metrics))
         resume_process_thread = Thread(target=processor.process)
         resume_process_thread.start()
         processor.wait_until_processing(5)
+        self.assertTrue(processor.is_processing())
+        self.assertEqual(processor.get_destinations(), [destination2])
 
         destination2.wait_until_expected_count_items(5)
         processor.shutdown()
         resume_process_thread.join(5)
-        self.assertGreaterEqual(expected_flushed_metrics,
-                                len(destination2.metrics))
+        self.assertGreaterEqual(len(destination2.metrics), expected_flushed_metrics2)
 
     def test_queue_can_only_change_when_not_processing(self):
         processor = QueueProcessor(Queue())

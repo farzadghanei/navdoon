@@ -89,10 +89,12 @@ class QueueProcessor(LoggerMixIn):
         return self._destinations
 
     def init_destinations(self):
-        self._log_debug("initializing {} destination threads ...".format(len(self._destinations)))
+        self._log_debug("initializing destination ...")
+        self._flush_threads_initialized.set()
         self._stop_flush_threads()
         self._clear_flush_threads()
 
+        self._log_debug("initializing {} destination threads ...".format(len(self._destinations)))
         for destination in self._destinations:
             queue_ = Queue()
             flush_thread = Thread(
@@ -124,7 +126,6 @@ class QueueProcessor(LoggerMixIn):
             self._log("processing the queue ...")
 
             if not self.destinations_initialized():
-                self._log_debug("initializing destinations ...")
                 self.init_destinations()
 
             queue_get = self._queue.get
@@ -132,7 +133,6 @@ class QueueProcessor(LoggerMixIn):
             process = self._process_request
             should_stop = self._should_stop_processing.is_set
             log_debug = self._log_debug
-            log = self._log
             flush = self.flush
 
             self._shutdown.clear()
@@ -141,7 +141,7 @@ class QueueProcessor(LoggerMixIn):
             try:
                 while True:
                     if should_stop():
-                        log_debug("instructed to shutdown")
+                        log_debug("instructed to shutdown. stopping processing ...")
                         break
                     try:
                         data = queue_get(timeout=1)
@@ -155,17 +155,18 @@ class QueueProcessor(LoggerMixIn):
 
                     if queue_has_data:
                         if data == self.stop_process_token:
-                            log("got stop process token in queue")
+                            self._log("got stop process token in queue")
                             break
                         elif data:
                             process(data)
             finally:
-                log("stopped processing the queue")
+                self._should_stop_processing.clear()
                 self._processing.clear()
                 self._stop_flush_threads()
                 self._clear_flush_threads()
                 self._flush_queues = []
                 self._shutdown.set()
+                self._log("stopped processing the queue")
 
     def flush(self):
         with self._flush_lock:
@@ -175,12 +176,10 @@ class QueueProcessor(LoggerMixIn):
             for queue_ in self._flush_queues:
                 queue_.put(metrics)
             self._last_flush_timestamp = now
-            self._log("flushed '{}' metrics to '{}' destinations".format(len(metrics), len(self._flush_queues)))
-
+            self._log("flushed {} metrics to {} queues".format(len(metrics), len(self._flush_queues)))
 
     def shutdown(self):
-        if self._processing.is_set():
-            self._log("shutting down ...")
+        self._log("shutting down ...")
         self._should_stop_processing.set()
         self._stop_flush_threads()
 
@@ -195,8 +194,10 @@ class QueueProcessor(LoggerMixIn):
         while not should_stop():
             try:
                 flush(queue_get(timeout=1))
+                self._log_debug("flushed metrics to destination {}".format(destination))
             except QueueEmptyError:
                 pass
+        self._log("stopped flushing metrics to destination {}".format(destination))
 
     def _process_request(self, request):
         self._log_debug("processing metrics: {}".format(str(request)))
