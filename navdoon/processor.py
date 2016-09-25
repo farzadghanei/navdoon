@@ -200,8 +200,9 @@ class QueueProcessor(LoggerMixIn):
         self._log("stopped flushing metrics to destination {}".format(destination))
 
     def _process_request(self, request):
-        self._log_debug("processing metrics: {}".format(str(request)))
-        lines = [line.strip() for line in request.split("\n")]
+        request = str(request)
+        self._log_debug("processing metrics: {}".format(request))
+        lines = [line.strip() for line in request.split("\n") if line.strip()]
         should_stop = self._should_stop_processing.is_set
         for line in lines:
             if should_stop():
