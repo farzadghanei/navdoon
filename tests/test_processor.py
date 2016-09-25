@@ -52,6 +52,8 @@ class TestQueueProcessor(unittest.TestCase):
         self.assertEqual(103, processor.flush_interval)
         processor.flush_interval = 0.58
         self.assertEqual(0.58, processor.flush_interval)
+        processor.flush_interval = '3.4'
+        self.assertEqual(3.4, processor.flush_interval)
 
     def test_set_flush_interval_fails_on_not_positive_numbers(self):
         processor = QueueProcessor(Queue())

@@ -74,7 +74,7 @@ class QueueProcessor(LoggerMixIn):
         if interval_float <= 0:
             raise ValueError(
                 "Invalid flush interval. Interval should be a positive number")
-        self._flush_interval = interval
+        self._flush_interval = interval_float
 
     def set_destinations(self, destinations):
         validate_destinations(destinations)
@@ -134,6 +134,7 @@ class QueueProcessor(LoggerMixIn):
             should_stop = self._should_stop_processing.is_set
             log_debug = self._log_debug
             flush = self.flush
+            flush_interval = self._flush_interval
 
             self._shutdown.clear()
             self._processing.set()
@@ -149,8 +150,7 @@ class QueueProcessor(LoggerMixIn):
                     except QueueEmptyError:
                         queue_has_data = False
 
-                    if time() - self._last_flush_timestamp\
-                            >= self._flush_interval:
+                    if float(time() - self._last_flush_timestamp) >= flush_interval:
                         flush()
 
                     if queue_has_data:
@@ -169,6 +169,7 @@ class QueueProcessor(LoggerMixIn):
                 self._log("stopped processing the queue")
 
     def flush(self):
+        self._log_debug("waiting for flush lock")
         with self._flush_lock:
             self._log_debug("flushing lock acquired")
             now = time()
