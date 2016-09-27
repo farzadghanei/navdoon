@@ -25,6 +25,7 @@ Features
 * Receive metrics from multiple addresses
 * Flush to multiple Graphite backends
 * Easy to integrate with custom programs
+* Ability to reload the server without losing the metrics
 
 
 Details
@@ -52,6 +53,9 @@ Details
   Future versions will offer improved performance as it was not a priority
   for the first releases.
 
+* Server supports reloading (on receiving SIGHUP), keeping current state of the metrics and last flush time.
+  So it's possible to change collectors, flush destinations, logging, etc. on the configuration file while
+  the server is running, and then on sending a SIGHUP the server picks the new configuration.
 
 Requirements
 ------------
