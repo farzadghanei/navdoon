@@ -297,7 +297,6 @@ class App(LoggerMixIn):
         # we can not set a handler for SIGHUP on Windows
         if hasattr(signal, 'SIGHUP'):
             try:
-                # FIXME: uncomment this after fixing reload
                 signal.signal(signal.SIGHUP, self._handle_signal_hup)
                 pass
             except ValueError:
