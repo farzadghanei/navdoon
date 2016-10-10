@@ -18,7 +18,7 @@ from __future__ import absolute_import, division, print_function
 
 __title__ = "navdoon"
 __summary__ = "Powerful Statsd server, made easy"
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 __author__ = "Farzad Ghanei"
 __license__ = "Apache License, Version 2.0"
 __copyright__ = "Copyright 2016 Farzad Ghanei"

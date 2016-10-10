@@ -17,7 +17,6 @@ Powerful Statsd server, made easy.
 Navdoon is a portable Statsd server with useful features to make it easy to
 use, extend and integrate.
 
-
 Features
 --------
 * Portable with few dependencies, easy to install on most platforms
@@ -56,6 +55,16 @@ Details
 * Server supports reloading (on receiving SIGHUP), keeping current state of the metrics and last flush time.
   So it's possible to change collectors, flush destinations, logging, etc. on the configuration file while
   the server is running, and then on sending a SIGHUP the server picks the new configuration.
+
+
+Releases
+========
+* Latest released version is *0.2.0* (released on 2016-10-10)
+* Previous released version was *0.1.1* (released on 2016-06-15)
+
+See the CHANGELOG for more information about features provided by each release.
+
+
 
 Requirements
 ------------
