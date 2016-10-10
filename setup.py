@@ -58,7 +58,7 @@ if setuptools:
     setup_params["test_suite"] = "tests"
     setup_params["zip_safe"] = False
     setup_params["extras_require"] = dict(
-        dev=["distutilazy>=0.4.1", "typing>=3.5.0.1", "coverage"]
+        dev=["distutilazy>=0.4.2", "typing>=3.5.0.1", "coverage"]
     )
     setup_params["entry_points"] = dict(
         console_scripts=["navdoon=navdoon.app:main",]
