@@ -9,27 +9,32 @@ from os import getpid
 from time import sleep
 from logging import INFO, DEBUG, ERROR, WARN
 from threading import Lock
+from navdoon.pystdlib.typing import AnyStr, Sequence
 
 
 class LoggerMixIn(object):
     """A MixIn class for anything that needs to log messages"""
 
     def __init__(self):
-        self.logger = None
-        self.log_pattern = "{signature}{message}"
-        self.log_signature = ''
-        self._pid = getpid()
+        self.logger = None  # type: logging.Logger
+        self.log_pattern = "{signature}{message}"  # type: str
+        self.log_signature = ''  # type: str
+        self._pid = getpid()  # type: int
 
     def _log_debug(self, msg):
+        # type: (str) -> None
         self._log(msg, DEBUG)
 
     def _log_error(self, msg):
+        # type: (str) -> None
         self._log(msg, ERROR)
 
     def _log_warn(self, msg):
+        # type: (str) -> None
         self._log(msg, WARN)
 
     def _log(self, msg, level=INFO):
+        # type: (str, int) -> None
         if self.logger:
             self.logger.log(
                 level,
@@ -42,15 +47,16 @@ class TCPClient(LoggerMixIn):
     """A generic TCP client with reconnecting feature"""
 
     def __init__(self, host, port):
+        # type: (str, int) -> None
         super(TCPClient, self).__init__()
-        self.host = host
-        self.port = port
-        self.max_retry = None
-        self._connection_tries = 0
-        self._sleep_between_retries = 0.5
-        self._sock = None
-        self._connection_lock = Lock()
-        self._sending_lock = Lock()
+        self.host = host  # type: str
+        self.port = port  # type: int
+        self.max_retry = None  # type: int
+        self._connection_tries = 0  # type: int
+        self._sleep_between_retries = 0.5  # type: float
+        self._sock = None  # type: socket.socket
+        self._connection_lock = Lock()  # type: Lock
+        self._sending_lock = Lock()  # type: Lock
 
     def connect(self):
         self._connection()
@@ -83,6 +89,7 @@ class TCPClient(LoggerMixIn):
             self._connection_tries = 0
 
     def _send_with_lock(self, data_bytes):
+        # type: (AnyStr) -> None
         data_size = len(data_bytes)
         with self._sending_lock:
             while True:
@@ -100,6 +107,7 @@ class TCPClient(LoggerMixIn):
                     self.reconnect()
 
     def _connection(self):
+        # type: () -> socket.socket
         with self._connection_lock:
             if not self._sock:
                 max_retry = self.max_retry
@@ -132,24 +140,30 @@ class TCPClient(LoggerMixIn):
 
 class DataSeries(object):
     def __init__(self, data):
-        self._count = len(data)
+        # type: (Sequence[float]) -> None
+        self._count = len(data)  # type: int
         if self._count < 1:
             raise ValueError("Can not create a series from an empty data set")
-        self._data = sorted(data)
+        self._data = sorted(data)  # type: Sequence[float]
 
     def count(self):
+        # type: () -> int
         return self._count
 
     def min(self):
+        # type: () -> float
         return min(self._data)
 
     def max(self):
+        # type: () -> float
         return max(self._data)
 
     def mean(self):
+        # type: () -> float
         return sum(self._data) / self._count
 
     def median(self):
+        # type: () -> float
         count = self._count
         if count == 2:
             return self.mean()

@@ -7,3 +7,5 @@ flushed to
 from navdoon.destination.abstract import AbstractDestination
 from navdoon.destination.graphite import Graphite
 from navdoon.destination.stream import Stream, Stdout
+
+__all__ = ['Graphite', 'Stream', 'Stdout']

@@ -5,6 +5,7 @@ Define an abstract base class for destinations
 """
 
 from abc import abstractmethod, ABCMeta
+from navdoon.pystdlib.typing import List, Tuple, AnyStr
 
 
 class AbstractDestination(object):
@@ -14,5 +15,6 @@ class AbstractDestination(object):
 
     @abstractmethod
     def flush(self, metrics):
+        # type: (List[Tuple[AnyStr, float, float]]) -> None
         """Flush the metrics"""
         raise NotImplementedError
