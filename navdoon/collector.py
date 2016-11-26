@@ -7,16 +7,19 @@ processed by the processor.
 
 import os
 import socket
+from socket import socket as SocketClass
 from abc import abstractmethod, ABCMeta
 from threading import Event
 from navdoon.pystdlib.queue import Queue
 from navdoon.utils.common import LoggerMixIn
 from navdoon.utils.system import ExpandableThreadPool
+from navdoon.pystdlib.typing import Dict, Any, Tuple, List, Optional
 
 DEFAULT_PORT = 8125
 
 
 def socket_type_repr(socket_type):
+    # type: (int) -> str
     sock_types = {
         socket.SOCK_STREAM: "TCP",
         socket.SOCK_DGRAM: "UDP"
@@ -30,30 +33,36 @@ class AbstractCollector(object):
     __metaclass__ = ABCMeta
 
     def __init__(self):
-        self._queue = Queue()
+        self._queue = Queue()  # type: Queue
 
     @abstractmethod
     def start(self):
+        # type: () -> None
         raise NotImplementedError
 
     @abstractmethod
     def wait_until_queuing_requests(self, timeout=None):
+        # type: (float) -> None
         raise NotImplementedError
 
     @abstractmethod
     def shutdown(self):
+        # type: () -> None
         raise NotImplementedError
 
     @abstractmethod
     def wait_until_shutdown(self, timeout=None):
+        # type: (float) -> None
         raise NotImplementedError
 
     @property
     def queue(self):
+        # type: () -> Queue
         return self._queue
 
     @queue.setter
     def queue(self, value):
+        # type: (Queue) -> None
         for method in ('put_nowait',):
             if not callable(getattr(value, method, None)):
                 raise ValueError(
@@ -68,32 +77,33 @@ class AbstractCollector(object):
 class SocketServer(LoggerMixIn, AbstractCollector):
     """Collect Statsd metrics via TCP/UDP socket"""
 
-    default_port = DEFAULT_PORT
-
     def __init__(self, **kargs):
+        # type: (**Dict[str, Any]) -> None
         AbstractCollector.__init__(self)
         LoggerMixIn.__init__(self)
-        self.chunk_size = 8196
-        self.socket_type = socket.SOCK_DGRAM
-        self.socket_timeout = 1
-        self.host = '127.0.0.1'
-        self.port = self.__class__.default_port
-        self.user = None
-        self.group = None
-        self.socket = None
-        self._stop_queuing_requests = Event()
-        self._queuing_requests = Event()
-        self._shutdown = Event()
-        self._should_shutdown = Event()
-        self.configure(**kargs)
-        self.log_signature = "collector.socket_server "
-        self.num_worker_threads = 4
-        self.worker_threads_limit = 128
+        self.chunk_size = 8196  # type: int
+        self.socket_type = socket.SOCK_DGRAM  # type: int
+        self.socket_timeout = 1  # type: float
+        self.host = '127.0.0.1'  # type: str
+        self.port = DEFAULT_PORT  # type: int
+        self.user = None  # type: int
+        self.group = None  # type: int
+        self.socket = None  # type: socket.socket
+        self._stop_queuing_requests = Event()  # type: Event
+        self._queuing_requests = Event()  # type: Event
+        self._shutdown = Event()  # type: Event
+        self._should_shutdown = Event()  # type: Event
+        self.configure(**kargs)  # type: Dict[str, Any]
+        self.log_signature = "collector.socket_server "  # type: str
+        self.num_worker_threads = 4  # type: int
+        self.worker_threads_limit = 128  # type: int
 
     def __del__(self):
+        # type: () -> None
         self._do_shutdown()
 
     def __repr__(self):
+        # type: () -> str
         return "collector.socket_server {}@{}:{}".format(
             socket_type_repr(self.socket_type),
             self.host,
@@ -101,6 +111,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         )
 
     def configure(self, **kargs):
+        # type: (**Dict[str, Any]) -> List[str]
         """Configure the server, setting attributes.
         Returns a list of attribute names that were affected
         """
@@ -113,6 +124,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         return configured
 
     def start(self):
+        # type: () -> None
         self._bind_socket()
         try:
             while not self._should_shutdown.is_set():
@@ -130,25 +142,31 @@ class SocketServer(LoggerMixIn, AbstractCollector):
             self._do_shutdown()
 
     def is_queuing_requests(self):
+        # type: () -> bool
         return self._queuing_requests.is_set()
 
     def wait_until_queuing_requests(self, timeout=None):
+        # type: (float) -> None
         self._queuing_requests.wait(timeout)
 
     def shutdown(self):
+        # type: () -> None
         self._log_debug("shutting down ...")
         self._stop_queuing_requests.set()
         self._should_shutdown.set()
 
     def wait_until_shutdown(self, timeout=None):
+        # type: (float) -> None
         self._log_debug("waiting until shutdown ...")
         self._shutdown.wait(timeout)
         self._log("shutdown successfully")
 
     def _pre_start(self):
+        # type: () -> None
         pass
 
     def _queue_requests_udp(self):
+        # type: () -> None
         should_stop = self._stop_queuing_requests.is_set
         chunk_size = self.chunk_size
         receive = self.socket.recv
@@ -170,6 +188,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
             self._queuing_requests.clear()
 
     def _queue_requests_tcp(self):
+        # type: () -> None
         stop_event = self._stop_queuing_requests
         should_stop_accepting = stop_event.is_set
         chunk_size = self.chunk_size
@@ -184,12 +203,13 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         thread_pool.initialize()
 
         def _enqueue_from_connection(conn, address):
+            # type: (socket.socket, Tuple[str, int]) -> None
             buffer_size = chunk_size
             enqueue = queue_put_nowait
             timeout_exception = socket_timeout_exception
             should_stop_queuing = stop_event.is_set
             receive = conn.recv
-            incomplete_line_chunk = ''
+            incomplete_line_chunk = u''
             try:
                 self._log_debug("collecting metrics from TCP {}:{} ...".format(address[0], address[1]))
                 while not should_stop_queuing():
@@ -233,13 +253,16 @@ class SocketServer(LoggerMixIn, AbstractCollector):
             self._queuing_requests.clear()
 
     def _post_start(self):
+        # type: () -> None
         pass
 
     def _do_shutdown(self):
+        # type: () -> None
         self._close_socket()
         self._shutdown.set()
 
     def _bind_socket(self, sock=None):
+        # type: (Optional[SocketClass]) -> None
         if not sock:
             sock = self._create_socket()
         self._close_socket()
@@ -248,6 +271,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         self._log("bound to address {}:{}".format(*sock.getsockname()))
 
     def _create_socket(self):
+        # type: () -> SocketClass
         sock = socket.socket(socket.AF_INET, self.socket_type)
         sock.bind((self.host, self.port))
         sock.settimeout(self.socket_timeout)
@@ -257,6 +281,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         return sock
 
     def _close_socket(self):
+        # type: () -> None
         sock = self.socket
         if sock:
             try:
@@ -268,6 +293,7 @@ class SocketServer(LoggerMixIn, AbstractCollector):
         self.socket = None
 
     def _change_process_user_group(self):
+        # type: () -> None
         if self.user:
             self._log("changing process user to {}".format(self.user))
             os.seteuid(self.user)

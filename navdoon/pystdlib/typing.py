@@ -7,7 +7,7 @@ on production.
 from __future__ import absolute_import
 
 try:
-    from typing import List, Dict, Tuple, AnyStr, IO, Any, Sequence, Union, Callable
+    from typing import List, Dict, Tuple, AnyStr, IO, Any, Sequence, Union, Callable, Optional
 except ImportError:
     List, Dict, Tuple, AnyStr, Any, IO, Sequence = None, None, None, None, None, None, None  # type: ignore
-    Union, Callable = None, None  # type: ignore
+    Union, Callable, Optional = None, None, None  # type: ignore
