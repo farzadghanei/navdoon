@@ -13,10 +13,13 @@ from navdoon.pystdlib import queue
 from navdoon.collector import AbstractCollector
 from navdoon.utils.common import LoggerMixIn
 from navdoon.processor import QueueProcessor
+from navdoon.pystdlib.typing import List, Optional
+from navdoon.pystdlib.queue import Queue
 
 
 def validate_collectors(collectors):
     """Validate collectors to be usable by the server"""
+    # type: (List[Any]) -> None
     for collector in collectors:
         if not isinstance(collector, AbstractCollector):
             raise ValueError(
@@ -30,38 +33,43 @@ class Server(LoggerMixIn):
     """
 
     def __init__(self):
+        # type: () -> None
         super(Server, self).__init__()
-        self.log_signature = 'server '
-        self._collectors = []
-        self._running_collectors = []
-        self._running = Event()
-        self._shutdown = Event()
-        self._reload = Event()
-        self._pause = Event()
-        self._should_reload = Event()
-        self._running_lock = RLock()
-        self._pause_lock = RLock()
-        self._queue = self._create_queue()
-        self._queue_processor = None
-        self._running_queue_processor = None
+        self.log_signature = 'server '  # type: str
+        self._collectors = []  # type: List[AbstractCollector]
+        self._running_collectors = []  # type: List[AbstractCollector]
+        self._running = Event()  # type: Event
+        self._shutdown = Event()  # type: Event
+        self._reload = Event()  # type: Event
+        self._pause = Event()  # type: Event
+        self._should_reload = Event()  # type: Event
+        self._running_lock = RLock()  # type: RLock
+        self._pause_lock = RLock()  # type: RLock
+        self._queue = self._create_queue()  # type: Queue
+        self._queue_processor = None  # type: QueueProcessor
+        self._running_queue_processor = None  # type: QueueProcessor
 
     @property
     def queue_processor(self):
+        # type: () -> QueueProcessor
         return self._queue_processor
 
     @queue_processor.setter
     def queue_processor(self, value):
+        # type: (QueueProcessor) -> None
         if not isinstance(value, QueueProcessor):
             raise ValueError(
                 "Invalid queue value. Processor should extend QueueProcessor")
         self._queue_processor = value
 
     def set_collectors(self, collectors):
+        # type: (List[AbstractCollector]) -> Server
         validate_collectors(collectors)
         self._collectors = collectors
         return self
 
     def start(self):
+        # type: () -> None
         """Start the queue processor in background then starts all the collectors.
         Blocks current thread, until shutdown() is called from another thread.
         """
@@ -104,6 +112,7 @@ class Server(LoggerMixIn):
                     self._log("reloading ...")
 
     def _start_collectors(self):
+        # type: () -> List[Thread]
         """Start collectors in background threads and returns the threads"""
         collector_threads = []
         self._log_debug("starting {} collectors ...".format(len(self._collectors)))
@@ -116,12 +125,15 @@ class Server(LoggerMixIn):
         return collector_threads
 
     def is_running(self):
+        # type: () -> bool
         return self._running.is_set()
 
     def wait_until_running(self, timeout=None):
+        # type: (Optional[float]) -> None
         self._running.wait(timeout)
 
     def shutdown(self, timeout=None):
+        # type: (Optional[float]) -> None
         """Shutdown the server, stopping the collectors and the queue processor"""
         with self._pause_lock:
             self._log("shutting down ...")
@@ -137,6 +149,7 @@ class Server(LoggerMixIn):
             self._shutdown.set()
 
     def wait_until_shutdown(self, timeout=None):
+        # type: (Optional[float]) -> None
         start = time()
         self._shutdown.wait(timeout)
         while True:
@@ -147,36 +160,43 @@ class Server(LoggerMixIn):
             sleep(0.5)
 
     def create_queue_processor(self):
+        # type: () -> QueueProcessor
         processor = QueueProcessor(self._queue)
         processor.logger = self.logger
         return processor
 
     def reload(self):
+        # type: () -> None
         with self._pause_lock:
             self._reload.clear()
             self._should_reload.set()
             self._pause.set()
 
     def wait_until_reload(self, timeout=None):
+        # type: (Optional[float]) -> None
         self._reload.wait(timeout)
 
     @staticmethod
     def _use_multiprocessing():
+        # type: () -> bool
         # FIXME: use multiprocessing if available
         # return available_cpus() > 1
         return False
 
     @classmethod
     def _create_queue(cls):
+        # type: () -> Queue
         return multiprocessing.Queue() if cls._use_multiprocessing() else queue.Queue()
 
     def _share_queue(self):
+        # type: () -> None
         queue_ = self._queue
         self._queue_processor.queue = queue_
         for collector in self._collectors:
             collector.queue = queue_
 
     def _close_queue(self):
+        # type: () -> None
         queue_ = self._queue
         if queue_:
             if callable(getattr(queue_, 'close', None)):
@@ -184,13 +204,14 @@ class Server(LoggerMixIn):
         self._queue = None
 
     def _start_queue_processor(self):
+        # type: () -> QueueProcessor
         if self._use_multiprocessing():
             self._log_debug("starting queue processor in a separate process")
             queue_process = multiprocessing.Process(target=self._queue_processor.process)
             queue_process.start()
         else:
             self._log_debug("starting queue processor in a thread")
-            queue_process = Thread(target=self._queue_processor.process)
+            queue_process = Thread(target=self._queue_processor.process)  # type: ignore
             queue_process.start()
 
         self._queue_processor.wait_until_processing(30)
@@ -203,6 +224,7 @@ class Server(LoggerMixIn):
         return queue_process
 
     def _shutdown_queue_processor(self, timeout=None):
+        # type: (Optional[float]) -> bool
         if not self._running_queue_processor:
             return False
         start_time = time()
@@ -219,6 +241,7 @@ class Server(LoggerMixIn):
         return True
 
     def _shutdown_collectors(self, timeout=None):
+        # type: (Optional[float]) -> None
         if not self._running_collectors:
             return
 
