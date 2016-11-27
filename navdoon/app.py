@@ -20,15 +20,17 @@ from time import sleep
 import navdoon
 from navdoon.pystdlib import configparser
 from navdoon.server import Server
-from navdoon.destination import Stdout, Graphite
-from navdoon.collector import SocketServer, DEFAULT_PORT
+from navdoon.destination import Stdout, Graphite, AbstractDestination
+from navdoon.collector import AbstractCollector, SocketServer, DEFAULT_PORT
 from navdoon.utils.common import LoggerMixIn
 from navdoon.utils.system import os_syslog_socket
+from navdoon.pystdlib.typing import Tuple, IO, Dict, Any, Set
 
-LOG_LEVEL_NAMES = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')
+LOG_LEVEL_NAMES = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')  # type: Tuple[str]
 
 
 def parse_config_file(file_):
+    # type: (IO) -> Dict[str, Any]
     """Parse app configurations from contents of a file"""
 
     parser = configparser.ConfigParser()
@@ -48,8 +50,9 @@ def parse_config_file(file_):
 
 
 def default_syslog_socket():
+    # type: () -> str
     return os_syslog_socket() or 'localhost:{}'.format(
-        logging.handlers.SYSLOG_UDP_PORT)
+        logging.handlers.SYSLOG_UDP_PORT)  # type: ignore
 
 
 class App(LoggerMixIn):
@@ -58,27 +61,31 @@ class App(LoggerMixIn):
     """
 
     def __init__(self, args):
-        super(App, self).__init__()
-        self.log_signature = "navdoon.app "
-        self._config = dict()
-        self._args = args
-        self._server = None
-        self._run_lock = RLock()
-        self._shutdown_lock = RLock()
-        self._reload_lock = RLock()
+        # type: (List[str]) -> None
+        LoggerMixIn.__init__(self)
+        self.log_signature = "navdoon.app "  # type: str
+        self._config = dict()  # type: Dict[str, Any]
+        self._args = args  # type: List[str]
+        self._server = None  # type: Server
+        self._run_lock = RLock()  # type: RLock
+        self._shutdown_lock = RLock()  # type: RLock
+        self._reload_lock = RLock()  # type: RLock
         self._configure(args)
 
     def __del__(self):
+        # type() -> None
         self.shutdown(1)
         self._close_logger()
 
     @staticmethod
     def get_description():
+        # type: () -> str
         return "{} v{}\n{}".format(navdoon.__title__, navdoon.__version__,
                                    navdoon.__summary__)
 
     @staticmethod
     def get_default_config():
+        # type: () -> Dict[str, Any]
         return dict(config=None,
                     log_level='INFO',
                     log_file=None,
@@ -94,17 +101,21 @@ class App(LoggerMixIn):
                     collector_threads_limit=128)
 
     def get_args(self):
+        # type: () -> List[Any]
         return self._args
 
     def get_config(self):
+        # type: () -> Dict[str, Any]
         return self._config
 
     def get_logger(self):
+        # type: () -> logging.Logger
         if not self.logger:
-            self.logger = self._create_logger()
+            self.logger = self._create_logger()  # type: logging.Logger
         return self.logger
 
     def create_destinations(self):
+        # type: () -> List[AbstractDestination]
         destinations = []
         if self._config.get('flush_stdout'):
             destinations.append(Stdout())
@@ -118,6 +129,7 @@ class App(LoggerMixIn):
         return destinations
 
     def create_collectors(self):
+        # type: () -> List[AbstractCollector]
         collectors = []
         if self._config.get('collect_tcp'):
             tcp_collectors = self._create_socket_servers(
@@ -137,6 +149,7 @@ class App(LoggerMixIn):
         return collectors
 
     def _create_socket_servers(self, addresses, socket_type):
+        # type: (str, int) -> List[SocketServer]
         collectors = []
         socket_addresses = self.get_addresses_with_unique_ports(
             addresses)
@@ -151,10 +164,12 @@ class App(LoggerMixIn):
         return collectors
 
     def create_server(self):
+        # type: () -> Server
         server = Server()
         return self._configure_server(server)
 
     def run(self):
+        # type: () -> int
         with self._run_lock:
             self._register_signal_handlers()
             self._server = self.create_server()
@@ -165,8 +180,10 @@ class App(LoggerMixIn):
             while server_thread.is_alive():
                 sleep(2)
             server_thread.join()
+        return 0
 
     def shutdown(self, timeout=None):
+        # type: (float) -> None
         if not self._server:
             return
         with self._shutdown_lock:
@@ -176,6 +193,7 @@ class App(LoggerMixIn):
             self._log("server shutdown successfully")
 
     def reload(self):
+        # type: () -> None
         with self._reload_lock:
             if not self._server:
                 raise Exception("App is not running, can not reload")
@@ -187,6 +205,7 @@ class App(LoggerMixIn):
             self._server.reload()
 
     def _configure_server(self, server):
+        # type: (Server) -> Server
         conf = self.get_config()
         logger = self.get_logger()
         destinations = self.create_destinations()
@@ -203,6 +222,7 @@ class App(LoggerMixIn):
         return server
 
     def _configure_socket_server(self, collector, host=None, port=None):
+        # type: (SocketServer, str, int) -> SocketServer
         logger = self.get_logger()
         if logger.handlers:
             collector.logger = logger
@@ -213,6 +233,7 @@ class App(LoggerMixIn):
         return collector
 
     def _configure(self, args):
+        # type: (Dict[str, Any]) -> None
         parsed_args = vars(self._parse_args(args))
         configs = self.get_default_config()
         if parsed_args['config'] is not None:
@@ -231,6 +252,7 @@ class App(LoggerMixIn):
         self._config = configs
 
     def _parse_args(self, args):
+        # type: (List[str]) -> Dict[str, Any]
         parser = ArgumentParser(description=self.get_description())
         parser.add_argument('-c',
                             '--config',
@@ -279,6 +301,7 @@ class App(LoggerMixIn):
         return parser.parse_args(args)
 
     def _validate_configs(self, args):
+        # type: (Dict[str, Any]) -> None
         none_negative_args = ('collector_threads_limit',)
         greater_than_one_args = ('collector_threads',)
         for key, value in args.items():
@@ -292,6 +315,7 @@ class App(LoggerMixIn):
                 "The value for collector_threads_limit can not be less than collector_threads")
 
     def _register_signal_handlers(self):
+        # type: () -> None
         signal.signal(signal.SIGINT, self._handle_signal_int)
         signal.signal(signal.SIGTERM, self._handle_signal_term)
         # we can not set a handler for SIGHUP on Windows
@@ -303,22 +327,26 @@ class App(LoggerMixIn):
                 pass
 
     def _handle_signal_int(self, *args):
+        # type: (*Any) -> None
         self._log("received SIGINT")
         self.shutdown()
 
     def _handle_signal_term(self, *args):
+        # type: (*Any) -> None
         self._log("received SIGTERM")
         self.shutdown()
 
     def _handle_signal_hup(self, *args):
+        # type: (*Any) -> None
         self._log("received SIGHUP")
         self.reload()
 
     def _create_logger(self):
+        # type: () -> logging.Logger
         log_level_name = self._config.get('log_level', 'INFO')
         if log_level_name not in LOG_LEVEL_NAMES:
             raise ValueError("invalid log level " + log_level_name)
-        logger = logging.Logger('navdoon')
+        logger = logging.Logger('navdoon')  # type: ignore
         logger.addHandler(logging.NullHandler())
         logger.setLevel(getattr(logging, log_level_name))
         if self._config.get('log_stderr'):
@@ -336,6 +364,7 @@ class App(LoggerMixIn):
         return logger
 
     def _close_logger(self):
+        # type: () -> None
         if self.logger:
             handlers = []
             for handler in self.logger.handlers:
@@ -347,10 +376,11 @@ class App(LoggerMixIn):
 
     @staticmethod
     def get_addresses_with_unique_ports(addresses):
+        # type: (str) -> List[Tuple[str, int]]
         address_tuples = [tuple(address.strip().split(':')) for address in
                           addresses.split(',')]
-        result = []
-        ports = set()
+        result = []  # type: List[Tuple[str, int]]
+        ports = set()  # type: Set[int]
         for address in address_tuples:
             host = address[0]
             if len(address) > 1 and address[1]:
@@ -370,6 +400,7 @@ class App(LoggerMixIn):
 
 
 def main(args=sys.argv[1:]):
+    # type: (List[str]) -> int
     """Entry point, setup and start the application"""
     app = App(args)
     return app.run()
