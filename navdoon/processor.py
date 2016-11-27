@@ -9,6 +9,8 @@ from time import time
 from threading import Event, RLock, Thread
 from navdoon.pystdlib.queue import Empty, Queue
 from navdoon.utils.common import LoggerMixIn, DataSeries
+from navdoon.pystdlib.typing import List, Any, Tuple, Dict
+from navdoon.destination import AbstractDestination
 from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer,
                            parse_metric_from_request)
 
@@ -22,6 +24,7 @@ def validate_destinations(destinations):
 
 
 def validate_queue(queue_):
+    # type: (Any) -> None
     if not callable(getattr(queue_, 'get', None)):
         raise ValueError("Invalid queue for queue processor."
                          "queue should have a get() method")
@@ -30,34 +33,35 @@ def validate_queue(queue_):
 class QueueProcessor(LoggerMixIn):
     """Process Statsd requests queued by the collectors"""
 
-    default_stop_process_token = None
-
     def __init__(self, queue_):
+        # type: (Queue) -> None
         validate_queue(queue_)
         super(QueueProcessor, self).__init__()
-        self.log_signature = 'queue.processor '
-        self.stop_process_token = self.__class__.default_stop_process_token
-        self._flush_interval = 1
-        self._queue = queue_
-        self._should_stop_processing = Event()
-        self._processing = Event()
-        self._shutdown = Event()
-        self._processing_lock = RLock()
-        self._flush_lock = RLock()
-        self._shelf = StatsShelf()
-        self._destinations = []
-        self._flush_queues = []
-        self._flush_threads = []
-        self._flush_threads_initialized = Event()
-        self._should_stop_flushing = Event()
-        self._last_flush_timestamp = None
+        self.log_signature = 'queue.processor '  # type: str
+        self.stop_process_token = None  # type: str
+        self._flush_interval = 1  # type: float
+        self._queue = queue_  # type: Queue
+        self._should_stop_processing = Event()  # type: Event
+        self._processing = Event()  # type: Event
+        self._shutdown = Event()  # type: Event
+        self._processing_lock = RLock()  # type: RLock
+        self._flush_lock = RLock()  # type: RLock
+        self._shelf = StatsShelf()  # type: StatsShelf
+        self._destinations = []  # type: List[AbstractDestination]
+        self._flush_queues = []  # type: List[Queue]
+        self._flush_threads = []  # type: List[Thread]
+        self._flush_threads_initialized = Event()  # type: Event
+        self._should_stop_flushing = Event()  # type: Event
+        self._last_flush_timestamp = None  # type: float
 
     @property
     def queue(self):
+        # type: () -> Queue
         return self._queue
 
     @queue.setter
     def queue(self, queue_):
+        # type: (Queue) -> None
         validate_queue(queue_)
         if self.is_processing():
             raise Exception(
@@ -66,10 +70,12 @@ class QueueProcessor(LoggerMixIn):
 
     @property
     def flush_interval(self):
+        # type: () -> float
         return self._flush_interval
 
     @flush_interval.setter
     def flush_interval(self, interval):
+        # type: (float) -> None
         interval_float = float(interval)
         if interval_float <= 0:
             raise ValueError(
@@ -77,18 +83,22 @@ class QueueProcessor(LoggerMixIn):
         self._flush_interval = interval_float
 
     def set_destinations(self, destinations):
+        # type: (List[AbstractDestination]) -> QueueProcessor
         validate_destinations(destinations)
         self._destinations = destinations
         return self
 
     def clear_destinations(self):
+        # type: () -> QueueProcessor
         self._destinations = []
         return self
 
     def get_destinations(self):
+        # type: () -> List[AbstractDestination]
         return self._destinations
 
     def init_destinations(self):
+        # type: () -> None
         self._log_debug("initializing destination ...")
         self._flush_threads_initialized.set()
         self._stop_flush_threads()
@@ -100,7 +110,7 @@ class QueueProcessor(LoggerMixIn):
             flush_thread = Thread(
                 target=self._flush_metrics_queue_to_destination,
                 args=(queue_, destination))
-            flush_thread.setDaemon = True
+            flush_thread.setDaemon(True)
             flush_thread.start()
             self._flush_queues.append(queue_)
             self._flush_threads.append(flush_thread)
@@ -109,15 +119,19 @@ class QueueProcessor(LoggerMixIn):
         self._log_debug("initialized {} destination threads".format(len(self._flush_threads)))
 
     def destinations_initialized(self):
+        # type: () -> bool
         return self._flush_threads_initialized.is_set()
 
     def is_processing(self):
+        # type: () -> bool
         return self._processing.is_set()
 
     def wait_until_processing(self, timeout=None):
-        return self._processing.wait(timeout)
+        # type: (float) -> None
+        self._processing.wait(timeout)
 
     def process(self):
+        # type: () -> None
         self._log_debug("waiting for process lock ...")
         with self._processing_lock:
             self._log_debug("process lock acquired")
@@ -169,6 +183,7 @@ class QueueProcessor(LoggerMixIn):
                 self._log("stopped processing the queue")
 
     def flush(self):
+        # type: () -> None
         self._log_debug("waiting for flush lock")
         with self._flush_lock:
             self._log_debug("flushing lock acquired")
@@ -180,14 +195,17 @@ class QueueProcessor(LoggerMixIn):
             self._log("flushed {} metrics to {} queues".format(len(metrics), len(self._flush_queues)))
 
     def shutdown(self):
+        # type: () -> None
         self._log("shutting down ...")
         self._should_stop_processing.set()
         self._stop_flush_threads()
 
     def wait_until_shutdown(self, timeout=None):
-        return self._shutdown.wait(timeout)
+        # type: (float) -> None
+        self._shutdown.wait(timeout)
 
     def _flush_metrics_queue_to_destination(self, queue_, destination):
+        # type: (Queue, AbstractDestination) -> None
         should_stop = self._should_stop_flushing.is_set
         queue_get = queue_.get
         flush = destination.flush
@@ -201,6 +219,7 @@ class QueueProcessor(LoggerMixIn):
         self._log("stopped flushing metrics to destination {}".format(destination))
 
     def _process_request(self, request):
+        # type: (str) -> None
         request = str(request)
         self._log_debug("processing metrics: {}".format(request))
         lines = [line.strip() for line in request.split("\n") if line.strip()]
@@ -218,6 +237,7 @@ class QueueProcessor(LoggerMixIn):
             self._shelf.add(metric)
 
     def _get_metrics_and_clear_shelf(self, timestamp):
+        # type: (float) -> List[Tuple[str, float, float]]
         shelf = self._shelf
         counters = shelf.counters()
         gauges = shelf.gauges()
@@ -248,11 +268,13 @@ class QueueProcessor(LoggerMixIn):
         return metrics
 
     def _stop_flush_threads(self):
+        # type: () -> QueueProcessor
         self._log_debug("flush threads should stop")
         self._should_stop_flushing.set()
         return self
 
     def _clear_flush_threads(self):
+        # type: () -> QueueProcessor
         self._log_debug("clearing {} flush threads".format(len(self._flush_threads)))
         for thread in self._flush_threads:
             if thread:
@@ -271,17 +293,19 @@ class StatsShelf(object):
                            Set.__name__: '_add_set',
                            Gauge.__name__: '_add_gauge',
                            GaugeDelta.__name__: '_add_gauge_delta',
-                           Timer.__name__: '_add_timer'}
+                           Timer.__name__: '_add_timer'}  # type: Dict[str, str]
 
     def __init__(self):
-        self._lock = RLock()
-        self._counters = dict()
-        self._timers = dict()
-        self._sets = dict()
-        self._gauges = dict()
+        # type: () -> None
+        self._lock = RLock()  # type: RLock
+        self._counters = dict()  # type: Dict[str, float]
+        self._timers = dict()  # type: Dict[str, List[float]]
+        self._sets = dict()  # type: Dict[str, Any]
+        self._gauges = dict()  # type: Dict[str, float]
 
     def add(self, metric):
-        method_name = self.__class__._metric_add_methods.get(
+        # type: (Any) -> None
+        method_name = self._metric_add_methods.get(
             metric.__class__.__name__)
         if not method_name:
             raise ValueError(
@@ -291,18 +315,23 @@ class StatsShelf(object):
             getattr(self, method_name)(metric)
 
     def counters(self):
+        # type: () -> Dict[str, float]
         return self._counters.copy()
 
     def sets(self):
+        # type: () -> Dict[str, float]
         return self._sets.copy()
 
     def gauges(self):
+        # type: () -> Dict[str, float]
         return self._gauges.copy()
 
     def timers_data(self):
+        # type: () -> Dict[str, Dict[str, float]]
         return self._timers.copy()
 
     def timers(self):
+        # type: () -> Dict[str, List[float]]
         result = dict()
         for name, timers in self._timers.items():
             series = DataSeries(timers)
@@ -311,12 +340,14 @@ class StatsShelf(object):
         return result
 
     def clear(self):
+        # type: () -> None
         self._counters = dict()
         self._timers = dict()
         self._sets = dict()
         self._gauges = dict()
 
     def _add_counter(self, counter):
+        # type: (Counter) -> None
         counters = self._counters
         name = counter.name
         if name not in counters:
@@ -324,12 +355,15 @@ class StatsShelf(object):
         counters[name] += counter.count / counter.sample_rate
 
     def _add_set(self, metric):
+        # type: (Set) -> None
         self._sets.setdefault(metric.name, set()).add(metric.value)
 
     def _add_gauge(self, metric):
+        # type: (Gauge) -> None
         self._gauges[metric.name] = metric.value
 
     def _add_gauge_delta(self, metric):
+        # type: (GaugeDelta) -> None
         gauges = self._gauges
         name = metric.name
         if name not in gauges:
@@ -338,5 +372,6 @@ class StatsShelf(object):
             gauges[name] += metric.delta
 
     def _add_timer(self, metric):
+        # type: (Timer) -> None
         self._timers.setdefault(metric.name, list()).append(
             metric.milliseconds)
