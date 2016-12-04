@@ -13,7 +13,7 @@ from navdoon.pystdlib import queue
 from navdoon.collector import AbstractCollector
 from navdoon.utils.common import LoggerMixIn
 from navdoon.processor import QueueProcessor
-from navdoon.pystdlib.typing import List, Optional
+from navdoon.pystdlib.typing import List, Optional, Union
 from navdoon.pystdlib.queue import Queue
 
 
@@ -200,11 +200,11 @@ class Server(LoggerMixIn):
         queue_ = self._queue
         if queue_:
             if callable(getattr(queue_, 'close', None)):
-                queue_.close()
+                queue_.close()  # type: ignore
         self._queue = None
 
     def _start_queue_processor(self):
-        # type: () -> QueueProcessor
+        # type: () -> Union[multiprocessing.Process, Thread]
         if self._use_multiprocessing():
             self._log_debug("starting queue processor in a separate process")
             queue_process = multiprocessing.Process(target=self._queue_processor.process)

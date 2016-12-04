@@ -7,7 +7,7 @@ A destination to flush metrics to Graphite
 from time import time
 from navdoon.utils.common import TCPClient
 from navdoon.destination.abstract import AbstractDestination
-from navdoon.pystdlib.typing import List, Tuple, Any
+from navdoon.pystdlib.typing import List, Tuple, Any, AnyStr
 
 
 class Graphite(TCPClient, AbstractDestination):
@@ -22,7 +22,7 @@ class Graphite(TCPClient, AbstractDestination):
 
     @staticmethod
     def create_request_from_metrics(metrics):
-        # type: (List[Tuple[str, float, float]]) -> List[str]
+        # type: (List[Tuple[AnyStr, float, float]]) -> List[str]
         """Creates Graphite protocol lines from metrics"""
         requests = []
         for metric in metrics:
@@ -32,13 +32,13 @@ class Graphite(TCPClient, AbstractDestination):
         return requests
 
     def flush(self, metrics):
-        # type: (List[Tuple[str, float, float]]) -> None
+        # type: (List[Tuple[AnyStr, float, float]]) -> None
         """Flush metrics to Graphite"""
         lines = self.create_request_from_metrics(metrics)
         self._send_lines(lines)
 
     def _send_lines(self, lines):
-        # type: (List[str]) -> None
+        # type: (List[AnyStr]) -> None
         num_lines = len(lines)
         data = "\n".join([line.strip() for line in lines]).encode()
         self._log_debug("flushing {} metrics to graphite on {}:{} ...".format(

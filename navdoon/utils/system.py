@@ -40,10 +40,10 @@ class WorkerThread(Thread):
     """
 
     def __init__(self, queue, stop_event, results):
-        # type: (Queue, Event, Dict[str, Any]) -> None
+        # type: (Queue, Event, Dict[int, Any]) -> None
         self.queue = queue  # type: Queue
         self.stop_event = stop_event  # type: Event
-        self.results = results  # type: Dict[str, Any]
+        self.results = results  # type: Dict[int, Any]
         Thread.__init__(self)
 
     def _consume_queue(self):
@@ -118,7 +118,7 @@ class ThreadPool(LoggerMixIn):
         return self
 
     def do(self, func, *args, **kwargs):
-        # type: (Callable, *Sequence[Any], **Dict[Any,Any]) -> int
+        # type: (Callable, *Any, **Any) -> int
         if self._stop_event.is_set():
             raise Exception("Task thread pool has stopped")
         with self._queue_lock:

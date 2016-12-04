@@ -9,10 +9,10 @@ from time import time
 from threading import Event, RLock, Thread
 from navdoon.pystdlib.queue import Empty, Queue
 from navdoon.utils.common import LoggerMixIn, DataSeries
-from navdoon.pystdlib.typing import List, Any, Tuple, Dict
+from navdoon.pystdlib.typing import List, Any, Tuple, Dict, Set
 from navdoon.destination import AbstractDestination
-from statsdmetrics import (Counter, Gauge, GaugeDelta, Set, Timer,
-                           parse_metric_from_request)
+from statsdmetrics import (Counter, Gauge, GaugeDelta, Timer, parse_metric_from_request)
+from statsdmetrics import Set as SetMetric
 
 
 def validate_destinations(destinations):
@@ -106,7 +106,7 @@ class QueueProcessor(LoggerMixIn):
 
         self._log_debug("initializing {} destination threads ...".format(len(self._destinations)))
         for destination in self._destinations:
-            queue_ = Queue()
+            queue_ = Queue()  # type: Queue
             flush_thread = Thread(
                 target=self._flush_metrics_queue_to_destination,
                 args=(queue_, destination))
@@ -252,8 +252,8 @@ class QueueProcessor(LoggerMixIn):
         for name, value in gauges.items():
             metrics.append((name, value, timestamp))
 
-        for name, value in sets.items():
-            metrics.append((name, len(value), timestamp))
+        for name, values in sets.items():
+            metrics.append((name, len(values), timestamp))
 
         for name, timer_stats in timers.items():
             for statistic, value in timer_stats.items():
@@ -290,7 +290,7 @@ class StatsShelf(object):
     """A container that will aggregate and accumulate metrics"""
 
     _metric_add_methods = {Counter.__name__: '_add_counter',
-                           Set.__name__: '_add_set',
+                           SetMetric.__name__: '_add_set',
                            Gauge.__name__: '_add_gauge',
                            GaugeDelta.__name__: '_add_gauge_delta',
                            Timer.__name__: '_add_timer'}  # type: Dict[str, str]
@@ -300,7 +300,7 @@ class StatsShelf(object):
         self._lock = RLock()  # type: RLock
         self._counters = dict()  # type: Dict[str, float]
         self._timers = dict()  # type: Dict[str, List[float]]
-        self._sets = dict()  # type: Dict[str, Any]
+        self._sets = dict()  # type: Dict[str, Set[Any]]
         self._gauges = dict()  # type: Dict[str, float]
 
     def add(self, metric):
@@ -319,7 +319,7 @@ class StatsShelf(object):
         return self._counters.copy()
 
     def sets(self):
-        # type: () -> Dict[str, float]
+        # type: () -> Dict[str, Set[Any]]
         return self._sets.copy()
 
     def gauges(self):
@@ -327,11 +327,11 @@ class StatsShelf(object):
         return self._gauges.copy()
 
     def timers_data(self):
-        # type: () -> Dict[str, Dict[str, float]]
+        # type: () -> Dict[str, List[float]]
         return self._timers.copy()
 
     def timers(self):
-        # type: () -> Dict[str, List[float]]
+        # type: () -> Dict[str, Dict[str, float]]
         result = dict()
         for name, timers in self._timers.items():
             series = DataSeries(timers)
@@ -355,7 +355,7 @@ class StatsShelf(object):
         counters[name] += counter.count / counter.sample_rate
 
     def _add_set(self, metric):
-        # type: (Set) -> None
+        # type: (SetMetric) -> None
         self._sets.setdefault(metric.name, set()).add(metric.value)
 
     def _add_gauge(self, metric):

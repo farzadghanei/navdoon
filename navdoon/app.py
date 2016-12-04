@@ -13,7 +13,7 @@ import sys
 import logging
 import logging.handlers
 import signal
-from argparse import ArgumentParser, FileType
+from argparse import ArgumentParser, FileType, Namespace
 from threading import RLock, Thread
 from time import sleep
 
@@ -24,16 +24,16 @@ from navdoon.destination import Stdout, Graphite, AbstractDestination
 from navdoon.collector import AbstractCollector, SocketServer, DEFAULT_PORT
 from navdoon.utils.common import LoggerMixIn
 from navdoon.utils.system import os_syslog_socket
-from navdoon.pystdlib.typing import Tuple, IO, Dict, Any, Set
+from navdoon.pystdlib.typing import Tuple, IO, Dict, Any, Set, Mapping
 
-LOG_LEVEL_NAMES = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')  # type: Tuple[str]
+LOG_LEVEL_NAMES = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')  # type: Tuple[str, str, str, str, str, str]
 
 
 def parse_config_file(file_):
     # type: (IO) -> Dict[str, Any]
     """Parse app configurations from contents of a file"""
 
-    parser = configparser.ConfigParser()
+    parser = configparser.ConfigParser()  # type: ignore
     _parse_method = getattr(parser, 'read_file', parser.readfp)
     _parse_method(file_)
 
@@ -116,7 +116,7 @@ class App(LoggerMixIn):
 
     def create_destinations(self):
         # type: () -> List[AbstractDestination]
-        destinations = []
+        destinations = []  # type: List[AbstractDestination]
         if self._config.get('flush_stdout'):
             destinations.append(Stdout())
         if self._config.get('flush_graphite'):
@@ -130,7 +130,7 @@ class App(LoggerMixIn):
 
     def create_collectors(self):
         # type: () -> List[AbstractCollector]
-        collectors = []
+        collectors = []  # type: List[AbstractCollector]
         if self._config.get('collect_tcp'):
             tcp_collectors = self._create_socket_servers(
                 self._config['collect_tcp'], socket.SOCK_STREAM)
@@ -233,7 +233,7 @@ class App(LoggerMixIn):
         return collector
 
     def _configure(self, args):
-        # type: (Dict[str, Any]) -> None
+        # type: (List[str]) -> None
         parsed_args = vars(self._parse_args(args))
         configs = self.get_default_config()
         if parsed_args['config'] is not None:
@@ -252,7 +252,7 @@ class App(LoggerMixIn):
         self._config = configs
 
     def _parse_args(self, args):
-        # type: (List[str]) -> Dict[str, Any]
+        # type: (List[str]) -> Namespace
         parser = ArgumentParser(description=self.get_description())
         parser.add_argument('-c',
                             '--config',

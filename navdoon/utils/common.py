@@ -89,7 +89,7 @@ class TCPClient(LoggerMixIn):
             self._connection_tries = 0
 
     def _send_with_lock(self, data_bytes):
-        # type: (AnyStr) -> None
+        # type: (bytes) -> None
         data_size = len(data_bytes)
         with self._sending_lock:
             while True:
