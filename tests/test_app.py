@@ -1,12 +1,15 @@
+import os
 import socket
 import sys
 import logging
 import logging.handlers
 import unittest
 from os import path
+from tempfile import mkstemp
+
 from navdoon.app import App, parse_config_file, default_syslog_socket
 from navdoon.collector import SocketServer
-from navdoon.destination import Stdout, Graphite
+from navdoon.destination import Stdout, Graphite, TextFile
 from navdoon.processor import QueueProcessor
 
 test_config_file_path = path.join(
@@ -76,6 +79,7 @@ class TestApp(unittest.TestCase):
         self.assertLess(0, conf['flush_interval'])
         self.assertFalse(conf['flush_stdout'])
         self.assertEqual('', conf['flush_graphite'])
+        self.assertEqual('', conf['flush_file'])
         self.assertEqual('', conf['collect_udp'])
         self.assertEqual('', conf['collect_tcp'])
 
@@ -123,6 +127,20 @@ class TestApp(unittest.TestCase):
             Graphite ('localhost', 2003)
         ]
         self.assertEqual(expected, destinations)
+
+    def test_create_file_destinations(self):
+        try:
+            _, temp_file_name = mkstemp()
+            other_temp_file_name = temp_file_name + '_2'
+            app = App(['--flush-file', '{}|{}'.format(temp_file_name, other_temp_file_name)])
+            destinations = app.create_destinations()
+            self.assertEqual(2, len(destinations))
+            self.assertEqual([TextFile(temp_file_name), TextFile(other_temp_file_name)], destinations)
+        finally:
+            if os.path.exists(temp_file_name):
+                os.remove(temp_file_name)
+            if os.path.exists(other_temp_file_name):
+                os.remove(other_temp_file_name)
 
     def test_get_addresses_with_unique_ports(self):
         app = App([])
