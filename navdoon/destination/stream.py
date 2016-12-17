@@ -82,4 +82,3 @@ class CsvStdout(CsvStream):
     """Destination to flush metrics to standard output in CSV format"""
     def __init__(self):
         CsvStream.__init__(self, sys.stdout)
-
