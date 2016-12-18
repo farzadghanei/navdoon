@@ -75,12 +75,14 @@ def write_to_file(filename, content):
 
 class TestNavdoonStatsdServer(TestCase):
     @staticmethod
-    def create_server_program_args(config=CONF_FILE, udp_port=None, tcp_port=None, flush_interval=None, flush_file=None):
+    def create_server_program_args(config=CONF_FILE, udp_port=None, tcp_port=None, flush_interval=None, flush_file=None, flush_file_csv=None):
         program_args = [APP_BIN]
         if flush_interval is not None:
             program_args.extend(('--flush-interval', str(flush_interval)))
         if flush_file is not None:
             program_args.extend(('--flush-file', str(flush_file)))
+        if flush_file_csv is not None:
+            program_args.extend(('--flush-file-csv', str(flush_file_csv)))
         if config is not None:
             program_args.extend(('--config', config))
         if udp_port is not None:
@@ -249,7 +251,10 @@ flush-interval={}
         os.remove(file_name)
         udp_port = randint(8125, 8999)
         flush_interval = 2
-        self.app_process = self.create_server_process(udp_port=udp_port, flush_interval=flush_interval, flush_file=file_name)
+        csv_file_name = file_name + '.csv'
+        self.remove_files.append(file_name)
+        self.remove_files.append(csv_file_name)
+        self.app_process = self.create_server_process(udp_port=udp_port, flush_interval=flush_interval, flush_file=file_name, flush_file_csv=csv_file_name)
 
         client = Client("localhost", udp_port)
         for _ in range(0, 3):
@@ -265,16 +270,20 @@ flush-interval={}
         self.assertTrue(os.path.exists(file_name))
         with open(file_name) as file_handle:
             flushed_metrics = [line.rstrip() for line in file_handle.readlines()]
-        os.remove(file_name)
-        self.assertGreater(len(flushed_metrics), 5, 'flushed 1 counter and at least 4 timers')
-        self.assertDictEqual(
-            {
+
+        self.assertTrue(os.path.exists(csv_file_name))
+        with open(csv_file_name) as file_handle:
+            flushed_metrics_csv = [line.rstrip() for line in file_handle.readlines()]
+
+        expected_metrics_dict = {
                 "event": 3, "process.count": 3, "process.max": 24,
                 "process.min": 20, "process.mean": 22,
                 "process.median": 22
-            },
-            metrics_to_dict(flushed_metrics)
-        )
+            }
+        self.assertGreater(len(flushed_metrics), 5, 'flushed 1 counter and at least 4 timers')
+        self.assertDictEqual(expected_metrics_dict,  metrics_to_dict(flushed_metrics))
+
+        self.assertGreater(len(flushed_metrics_csv), 5, 'flushed 1 counter and at least 4 timers')
 
 
 if __name__ == '__main__':

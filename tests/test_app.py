@@ -9,7 +9,7 @@ from tempfile import mkstemp
 
 from navdoon.app import App, parse_config_file, default_syslog_socket
 from navdoon.collector import SocketServer
-from navdoon.destination import Stdout, Graphite, TextFile
+from navdoon.destination import Stdout, Graphite, TextFile, CsvFile
 from navdoon.processor import QueueProcessor
 
 test_config_file_path = path.join(
@@ -136,6 +136,20 @@ class TestApp(unittest.TestCase):
             destinations = app.create_destinations()
             self.assertEqual(2, len(destinations))
             self.assertEqual([TextFile(temp_file_name), TextFile(other_temp_file_name)], destinations)
+        finally:
+            if os.path.exists(temp_file_name):
+                os.remove(temp_file_name)
+            if os.path.exists(other_temp_file_name):
+                os.remove(other_temp_file_name)
+
+    def test_create_csv_file_destinations(self):
+        try:
+            _, temp_file_name = mkstemp()
+            other_temp_file_name = temp_file_name + '_2'
+            app = App(['--flush-file-csv', '{}|{}'.format(temp_file_name, other_temp_file_name)])
+            destinations = app.create_destinations()
+            self.assertEqual(2, len(destinations))
+            self.assertEqual([CsvFile(temp_file_name), CsvFile(other_temp_file_name)], destinations)
         finally:
             if os.path.exists(temp_file_name):
                 os.remove(temp_file_name)

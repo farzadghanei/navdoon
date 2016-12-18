@@ -34,3 +34,13 @@ class TextFile(Stream):
     def __eq__(self, other):
         # type: (Any) -> bool
         return self._name == other.name and self.pattern == other.pattern
+
+
+class CsvFile(TextFile):
+    """Destination to flush metrics to a CSV file"""
+
+    def __init__(self, name):
+        # type: (str) -> None
+        TextFile.__init__(self, name)
+        self.pattern = '"{name}","{value}","{timestamp}"'  # type: str
+        self.append = "\r\n"  # type: str
