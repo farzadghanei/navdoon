@@ -2,6 +2,13 @@
 Navdoon Changelog
 *****************
 
+Master
+------
+Not released
+
+* Add flushing to files in Carbon (space separated) and CSV format
+* Add MyPy type hint comments
+
 0.2.0
 -----
 Released on 2016-10-10
