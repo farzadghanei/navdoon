@@ -60,7 +60,7 @@ class Stream(AbstractDestination):
 
     def __eq__(self, other):
         # type: (Any) -> bool
-        return self.stream == other.stream
+        return self.stream == other.stream and self.pattern == other.pattern
 
 
 class Stdout(Stream):
@@ -68,3 +68,17 @@ class Stdout(Stream):
 
     def __init__(self):
         super(Stdout, self).__init__(sys.stdout)
+
+
+class CsvStream(Stream):
+    """Destination to flush metrics to a stream in CSV format"""
+    def __init__(self, file_handle):
+        Stream.__init__(self, file_handle)
+        self.pattern = '"{name}","{value}","{timestamp}"'  # type: str
+        self.append = "\r\n"  # type: str
+
+
+class CsvStdout(CsvStream):
+    """Destination to flush metrics to standard output in CSV format"""
+    def __init__(self):
+        CsvStream.__init__(self, sys.stdout)

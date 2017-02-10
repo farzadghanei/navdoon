@@ -1,10 +1,13 @@
+import os
 import unittest
 try:
     from StringIO import StringIO
 except ImportError:
     from io import StringIO
+from os import remove
 from time import time
-from navdoon.destination import Graphite, Stream
+from tempfile import mkstemp
+from navdoon.destination import Graphite, Stream, CsvStream, TextFile
 
 
 class TestGraphite(unittest.TestCase):
@@ -96,3 +99,46 @@ class TestStream(unittest.TestCase):
         metrics = [('users', 800, 5678), ('cpu', 99, 1234)]
         dest.flush(metrics)
         self.assertEqual("(users:'800')(cpu:'99')", output.getvalue())
+
+
+class TestCsvStream(unittest.TestCase):
+    def test_create_output_from_metrics(self):
+        output = StringIO()
+        dest = CsvStream(output)
+
+        metrics = [('events', 8, 12345), ('mem', 34, 98765)]
+        self.assertEqual(['"events","8","12345"', '"mem","34","98765"'],
+                         dest.create_output_from_metrics(metrics), )
+
+        metrics = [('no.time', 192), ('is.fine', 221, time())]
+        self.assertEqual(2, len(dest.create_output_from_metrics(metrics)))
+
+    def test_flush(self):
+        output = StringIO()
+        dest = CsvStream(output)
+        metrics = [('logins', 12, 456789), ('mem', 53, 98765)]
+        dest.flush(metrics)
+        self.assertEqual('"logins","12","456789"\r\n"mem","53","98765"\r\n', output.getvalue())
+
+
+class TestTextFile(unittest.TestCase):
+    def setUp(self):
+        _, self.temp_file_name = mkstemp()
+        os.remove(self.temp_file_name)
+
+    def tearDown(self):
+        if os.path.exists(self.temp_file_name):
+            remove(self.temp_file_name)
+
+    def test_flush(self):
+        dest = TextFile(self.temp_file_name)
+        metrics = [('logins', 12, 456789), ('mem', 53, 98765)]
+        dest.flush(metrics)
+        self.assertTrue(os.path.exists(self.temp_file_name))
+        self.assertFileHasLine('logins 12 456789', self.temp_file_name)
+        self.assertFileHasLine('mem 53 98765', self.temp_file_name)
+
+    def assertFileHasLine(self, expected, filename):
+        with open(filename) as file_:
+            lines = [line.rstrip() for line in file_.readlines()]
+            self.assertIn(expected, lines)

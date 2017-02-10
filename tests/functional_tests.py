@@ -75,10 +75,14 @@ def write_to_file(filename, content):
 
 class TestNavdoonStatsdServer(TestCase):
     @staticmethod
-    def create_server_program_args(config=CONF_FILE, udp_port=None, tcp_port=None, flush_interval=None):
+    def create_server_program_args(config=CONF_FILE, udp_port=None, tcp_port=None, flush_interval=None, flush_file=None, flush_file_csv=None):
         program_args = [APP_BIN]
         if flush_interval is not None:
             program_args.extend(('--flush-interval', str(flush_interval)))
+        if flush_file is not None:
+            program_args.extend(('--flush-file', str(flush_file)))
+        if flush_file_csv is not None:
+            program_args.extend(('--flush-file-csv', str(flush_file_csv)))
         if config is not None:
             program_args.extend(('--config', config))
         if udp_port is not None:
@@ -121,9 +125,9 @@ class TestNavdoonStatsdServer(TestCase):
         client = Client("localhost", udp_port)
         for _ in range(0, 3):
             client.increment("event")
-        client.timing("process", 10.1)
-        client.timing("process", 10.2)
-        client.timing("process", 10.3)
+        client.timing("process", 101)
+        client.timing("process", 102)
+        client.timing("process", 103)
         # wait for at least 1 flush
         sleep(flush_interval)
         self.app_process.terminate()
@@ -132,9 +136,9 @@ class TestNavdoonStatsdServer(TestCase):
         self.assertGreater(len(flushed_metrics), 5, 'flushed 1 counter and at least 4 timers')
         self.assertDictEqual(
             {
-                "event": 3, "process.count": 3, "process.max": 10.3,
-                "process.min": 10.1, "process.mean": 10.2,
-                "process.median": 10.2
+                "event": 3, "process.count": 3, "process.max": 103,
+                "process.min": 101, "process.mean": 102,
+                "process.median": 102
             },
             metrics_to_dict(flushed_metrics)
         )
@@ -151,9 +155,9 @@ class TestNavdoonStatsdServer(TestCase):
             client.increment("event")
             tcp_client.increment("event")
 
-        client.timing("process", 8.5)
-        client.timing("process", 9.8)
-        tcp_client.timing("process", 8.7)
+        client.timing("process", 85)
+        client.timing("process", 98)
+        tcp_client.timing("process", 87)
         tcp_client.timing("query", 2)
         # wait for at least 1 flush
         sleep(flush_interval)
@@ -165,9 +169,9 @@ class TestNavdoonStatsdServer(TestCase):
         self.maxDiff = None
         self.assertDictEqual(
             {
-                "event": 4, "process.count": 3, "process.max": 9.8,
-                "process.min": 8.5, "process.mean": 9.0,
-                "process.median": 8.7, "query.count": 1, "query.max": 2.0,
+                "event": 4, "process.count": 3, "process.max": 98,
+                "process.min": 85, "process.mean": 90,
+                "process.median": 87, "query.count": 1, "query.max": 2.0,
                 "query.min": 2.0, "query.mean": 2.0, "query.median": 2.0
             },
             metrics_to_dict(flushed_metrics)
@@ -241,6 +245,45 @@ flush-interval={}
             },
             metrics_to_dict(flushed_metrics)
         )
+
+    def test_flushing_files(self):
+        _, file_name = mkstemp()
+        os.remove(file_name)
+        udp_port = randint(8125, 8999)
+        flush_interval = 2
+        csv_file_name = file_name + '.csv'
+        self.remove_files.append(file_name)
+        self.remove_files.append(csv_file_name)
+        self.app_process = self.create_server_process(udp_port=udp_port, flush_interval=flush_interval, flush_file=file_name, flush_file_csv=csv_file_name)
+
+        client = Client("localhost", udp_port)
+        for _ in range(0, 3):
+            client.increment("event")
+        client.timing("process", 20)
+        client.timing("process", 22)
+        client.timing("process", 24)
+        # wait for at least 1 flush
+        sleep(flush_interval)
+        self.app_process.terminate()
+        wait_until_server_shuts_down(self.app_process)
+
+        self.assertTrue(os.path.exists(file_name))
+        with open(file_name) as file_handle:
+            flushed_metrics = [line.rstrip() for line in file_handle.readlines()]
+
+        self.assertTrue(os.path.exists(csv_file_name))
+        with open(csv_file_name) as file_handle:
+            flushed_metrics_csv = [line.rstrip() for line in file_handle.readlines()]
+
+        expected_metrics_dict = {
+                "event": 3, "process.count": 3, "process.max": 24,
+                "process.min": 20, "process.mean": 22,
+                "process.median": 22
+            }
+        self.assertGreater(len(flushed_metrics), 5, 'flushed 1 counter and at least 4 timers')
+        self.assertDictEqual(expected_metrics_dict,  metrics_to_dict(flushed_metrics))
+
+        self.assertGreater(len(flushed_metrics_csv), 5, 'flushed 1 counter and at least 4 timers')
 
 
 if __name__ == '__main__':

@@ -20,11 +20,11 @@ from time import sleep
 import navdoon
 from navdoon.pystdlib import configparser
 from navdoon.server import Server
-from navdoon.destination import Stdout, Graphite, AbstractDestination
+from navdoon.destination import Stdout, Graphite, AbstractDestination, TextFile, CsvFile
 from navdoon.collector import AbstractCollector, SocketServer, DEFAULT_PORT
 from navdoon.utils.common import LoggerMixIn
 from navdoon.utils.system import os_syslog_socket
-from navdoon.pystdlib.typing import Tuple, IO, Dict, Any, Set, Mapping
+from navdoon.pystdlib.typing import Tuple, IO, Dict, Any, Set
 
 LOG_LEVEL_NAMES = ('DEBUG', 'INFO', 'WARN', 'ERROR', 'FATAL', 'CRITICAL')  # type: Tuple[str, str, str, str, str, str]
 
@@ -95,6 +95,8 @@ class App(LoggerMixIn):
                     flush_interval=1,
                     flush_stdout=False,
                     flush_graphite='',
+                    flush_file='',
+                    flush_file_csv='',
                     collect_udp='',
                     collect_tcp='',
                     collector_threads=4,
@@ -126,6 +128,12 @@ class App(LoggerMixIn):
                 graphite_port = graphite_address and int(graphite_address.pop(
                 )) or 2003
                 destinations.append(Graphite(graphite_host, graphite_port))
+        if self._config.get('flush_file'):
+            for file_path in self._config['flush_file'].split('|'):
+                destinations.append(TextFile(file_path))
+        if self._config.get('flush_file_csv'):
+            for file_path in self._config['flush_file_csv'].split('|'):
+                destinations.append(CsvFile(file_path))
         return destinations
 
     def create_collectors(self):
@@ -282,6 +290,14 @@ class App(LoggerMixIn):
         parser.add_argument('--flush-graphite',
                             help='comma separated graphite addresses to flush '
                                  'stats to, each in host[:port] format',
+                            default=None)
+        parser.add_argument('--flush-file',
+                            help='pipe separated file paths to flush '
+                                 'stats to',
+                            default=None)
+        parser.add_argument('--flush-file-csv',
+                            help='pipe separated file paths to flush '
+                                 'stats to in CSV format',
                             default=None)
         parser.add_argument('--collect-udp',
                             help='listen on UDP addresses to collect stats')
