@@ -23,6 +23,7 @@ Features
 * Support TCP, UDP
 * Receive metrics from multiple addresses
 * Flush to multiple Graphite backends
+* Flush to files (in Graphite and CSV format)
 * Easy to integrate with custom programs
 * Ability to reload the server without losing the metrics
 
