@@ -1,0 +1,16 @@
+FROM pypy:2-5
+MAINTAINER Farzad Ghanei
+
+COPY . /navdoon
+
+RUN cd /navdoon && pypy -m pip install -r requirements.txt && \
+    pypy setup.py build && \
+    pypy setup.py install && \
+    pypy setup.py clean && \
+    cp config.example.ini /etc/navdoon.ini && \
+    cd /usr/local/bin && \
+    rm -rf /navdoon
+
+EXPOSE 8125/udp
+WORKDIR /usr/local/bin
+CMD navdoon -c /etc/navdoon.ini
