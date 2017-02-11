@@ -60,11 +60,38 @@ Details
 
 Releases
 ========
-* Latest released version is *0.2.0* (released on 2016-10-10)
-* Previous released version was *0.1.1* (released on 2016-06-15)
+* Latest released version is *0.3.0* (released on 2017-02-11)
+* Version *0.2.0* was released on 2016-10-10
 
 See the CHANGELOG for more information about features provided by each release.
 
+
+Install
+-------
+Navdoon is distributed as a Docker image, and a Python package.
+
+PyPi
+====
+Navdoon can be installed from `pypi <https://pypi.python.org>`_ using `pip`.
+
+
+.. code-block:: bash
+
+    pip install navdoon
+
+
+Source
+======
+You can install from the source by running the `setup.py` script provided.
+
+
+.. code-block:: bash
+
+    python setup.py install
+
+
+.. note:: If you're installing Navdoon to a system path, you might need to
+            run the installation with `sudo` or under a privileged user.
 
 
 Requirements
@@ -73,12 +100,33 @@ Navdoon is written in Python, so running from source or installing it as a packa
 requires a Python runtime (version 2.7+, latest versions of Python 3 is recommended).
 
 The `statsdmetrics <https://pypi.python.org/pypi/statsdmetrics>`_ Python module
-is the only dependency to run navdoon.
+is the only dependency to run Navdoon.
 However these Python modules are recommended on development/test environment:
 
 * `distutilazy <https://pypi.python.org/pypi/distutilazy>`_ (>=0.4.2): helpful commands added to `setup.py` to run tests and clean temp files
 * `typing <https://pypi.python.org/pypi/typing>`_ (>=3.5.0): standard type annotations for Python
 * `coverage <https://pypi.python.org/pypi/coverage>`_: create test coverage reports
+
+
+Docker
+------
+Different Docker image tags are available, providing different runtimes.
+
+The default tag is based on CPython alpine images
+(trying to use latest versions of Python, currently 3.6)
+so the image size should be minimum.
+
+.. code-block:: bash
+
+    docker pull farzadghanei/navdoon
+    # or a specific version like farzadghanei/navdoon:0.3.0
+
+Another tag is available to run Navdoon on `PyPy <http://www.pypy.org>`_ (currently version 2).
+
+.. code-block:: bash
+
+    docker pull farzadghanei/navdoon:0.3.0-pypy2
+
 
 
 Running from source
@@ -103,29 +151,6 @@ in the project source path, but you may chose a custom path like
 
 Or you may skip installing and sourcing the virtual environment and install the (few)
 dependencies on your system.
-
-
-
-Install
--------
-Navdoon can be installed from `pypi <https://pypi.python.org>`_ using `pip`.
-
-
-.. code-block:: bash
-
-    pip install navdoon
-
-
-You can install from the source by running the `setup.py` script provided.
-
-
-.. code-block:: bash
-
-    python setup.py install
-
-
-.. note:: If you're installing navdoon to a system path, you might need to
-            run the installation with `sudo` or under a privileged user.
 
 
 License
