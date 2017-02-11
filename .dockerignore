@@ -1,0 +1,11 @@
+tests
+docs
+etc
+tox*
+*coverage*
+*travis*
+*appveyor*
+.git
+.eggs
+.tox
+.idea
