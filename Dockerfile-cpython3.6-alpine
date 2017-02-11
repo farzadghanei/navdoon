@@ -1,0 +1,16 @@
+FROM python:3.6.0-alpine
+MAINTAINER Farzad Ghanei
+
+COPY . /navdoon
+
+RUN cd /navdoon && python3 -m pip install -r requirements.txt && \
+    python3 setup.py build && \
+    python3 setup.py install && \
+    python3 setup.py clean && \
+    cp config.example.ini /etc/navdoon.ini && \
+    cd /usr/local/bin && \
+    rm -rf /navdoon
+
+EXPOSE 8125/udp
+WORKDIR /usr/local/bin
+CMD navdoon -c /etc/navdoon.ini
